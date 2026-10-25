@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rapoport · Axelrod's tournament, in your browser</title>
+<meta name="description" content="Write a Python strategy for the iterated prisoner's dilemma, run it against the classics from the Axelrod library, and watch every move. Everything runs in your browser.">
+<meta name="theme-color" content="#eef3ef">
+<link rel="icon" href="icons/mark.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"><!-- taste-skill-ignore: the mono is for the code editor -->
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="app">
+  <aside class="roster" id="roster">
+    <div class="mark"><svg viewBox="0 0 22 22" aria-hidden="true"><rect x="1" y="1" width="9" height="9" fill="#1b6c80"/><rect x="12.75" y="1.75" width="7.5" height="7.5" fill="none" stroke="#131416" stroke-width="1.5"/><rect x="1.75" y="12.75" width="7.5" height="7.5" fill="none" stroke="#131416" stroke-width="1.5"/><rect x="12" y="12" width="9" height="9" fill="#1b6c80"/></svg>Rapoport<button class="close" id="close-roster">Close</button></div>
+
+    <div class="settings">
+      <label>Turns <input type="number" min="1" max="10000" value="200" data-setting="turns"></label>
+      <label>Repetitions <input type="number" min="1" max="100" value="3" data-setting="repetitions"></label>
+      <label>Noise <input type="number" min="0" max="1" step="0.01" value="0" data-setting="noise"></label>
+      <label>Seed <input type="number" min="0" value="7" data-setting="seed"></label>
+    </div>
+
+    <h2>Your strategies</h2>
+    <ul class="list" id="mine"></ul>
+    <button class="new" id="new-strategy">New strategy</button>
+
+    <h2>Library <span class="count" id="lib-count"></span></h2>
+    <input class="search" id="search" type="search" placeholder="Find a strategy" aria-label="Find a library strategy">
+    <ul class="list library" id="lib"></ul>
+
+    <p class="foot">Python runs in this tab. Nothing leaves your computer.</p>
+  </aside>
+
+  <header class="topbar">
+    <button class="menu-toggle" id="menu" aria-label="Open the roster" aria-controls="roster" aria-expanded="false"><svg viewBox="0 0 20 20" fill="none"><path d="M3 5h14M3 10h14M3 15h14" stroke-linecap="round"/></svg></button>
+    <span class="phone-title">Rapoport</span>
+    <div class="settings">
+      <label>Turns <input type="number" min="1" max="10000" value="200" data-setting="turns"></label>
+      <label>Repetitions <input type="number" min="1" max="100" value="3" data-setting="repetitions"></label>
+      <label>Noise <input type="number" min="0" max="1" step="0.01" value="0" data-setting="noise"></label>
+      <label>Seed <input type="number" min="0" value="7" data-setting="seed"></label>
+    </div>
+    <span class="status" id="status">Loading the Python runtime</span>
+    <span class="spacer"></span>
+    <button class="btn primary" id="run" disabled>Run tournament</button>
+  </header>
+
+  <main class="sheet">
+    <div class="progress" id="progress"><i></i></div>
+    <div class="title">
+      <div>
+        <h1>Arena</h1>
+        <p class="finding" id="finding">Axelrod's tournament, in your browser. Pick strategies from the library, write your own in Python, run them round-robin and watch every move.</p>
+      </div>
+      <span class="stamp num" id="stamp"></span>
+    </div>
+
+    <div class="cards">
+      <section class="card wide" id="results">
+        <header>
+          <div><h2>Payoff per turn, row against column</h2><p class="note" id="results-note">Mutual cooperation pays 3, mutual defection 1, a sucker 0 and a cheat 5. Rows are ranked by their mean.</p></div>
+        </header>
+        <div class="matrix" id="matrix"></div>
+        <p class="empty" id="results-empty">No run yet. Tick a few strategies in the roster and run a tournament.</p>
+      </section>
+
+      <section class="card wide" id="tape-card">
+        <header>
+          <div><h2 id="tape-title">Match tape</h2><p class="note" id="tape-note">One square a turn. Filled is cooperate, hollow is defect. Click a cell of the matrix to see that pairing.</p></div>
+          <div class="segmented" id="reps" hidden></div>
+        </header>
+        <div class="tape" id="tape"></div>
+        <p class="empty" id="tape-empty">No match yet.</p>
+      </section>
+
+      <section class="card editor" id="editor-card">
+        <div class="tabs" id="tabs" role="tablist"></div>
+        <div class="source-pick" id="source-pick" hidden><span>Library source of</span><select class="input" id="source-select" aria-label="Library strategy to read"></select></div>
+        <div class="cm-host" id="cm"></div>
+      </section>
+
+      <section class="card check" id="check">
+        <header><div><h2>Check</h2><p class="note">A smoke match of 20 turns against Tit For Tat, seed 1.</p></div></header>
+        <div class="state" id="check-state"><i></i><span>Not checked yet.</span></div>
+        <div id="check-body"></div>
+        <div class="facts api">
+          <h3>Inside strategy(self, opponent)</h3>
+          <div><span><code>self.history</code></span><span>your moves so far</span></div>
+          <div><span><code>opponent.history</code></span><span>theirs, a list of C and D</span></div>
+          <div><span><code>opponent.defections</code></span><span>how often they defected</span></div>
+          <div><span><code>len(self.history)</code></span><span>the turn you are on</span></div>
+          <div><span><code>self._random.random()</code></span><span>a seeded float, for stochastic play</span></div>
+        </div>
+        <div class="actions">
+          <button class="btn primary" id="check-btn" disabled>Check</button>
+          <select class="input" id="opponent" aria-label="Opponent for one match"></select>
+          <button class="btn" id="play-btn" disabled>Play one match</button>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+<input type="file" id="import-file" accept=".py,text/x-python" hidden>
+<script type="module" src="app.js"></script>
+</body>
+</html>
