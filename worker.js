@@ -8,10 +8,12 @@
 // same name in py/engine.py.
 
 const PYODIDE = "https://cdn.jsdelivr.net/pyodide/v0.27.5/full/";
-const AXELROD = "axelrod==4.13.1";
-// Wheels the library imports at top level, loaded one by one so the page can
-// show progress through the 50 MB download.
-const WHEELS = ["numpy", "scipy", "pandas", "matplotlib", "pyyaml", "tqdm", "cloudpickle", "toolz", "fsspec"];
+// The library's wheel, fetched directly rather than resolved by micropip: its
+// declared dependencies include matplotlib and dask, which engine.py stubs.
+const AXELROD = "https://files.pythonhosted.org/packages/33/d5/5578f9af596db192ae209f5b4c6525ea615d9c778e8afec629873f3b4140/axelrod-4.13.1-py3-none-any.whl";
+// The wheels the library really imports, loaded one by one so the page can
+// show progress through the download.
+const WHEELS = ["numpy", "scipy", "pandas", "pyyaml", "tqdm"];
 
 importScripts(PYODIDE + "pyodide.js");
 
@@ -29,9 +31,8 @@ async function init(id) {
     step(`Fetching ${w}`);
     await py.loadPackage(w, { messageCallback: () => {} });
   }
-  step("Installing the Axelrod library");
-  await py.loadPackage("micropip", { messageCallback: () => {} });
-  await py.runPythonAsync(`import micropip\nawait micropip.install("${AXELROD}")`);
+  step("Fetching the Axelrod library");
+  await py.loadPackage(AXELROD, { messageCallback: () => {} });
   step("Starting the engine");
   const src = await (await fetch("py/engine.py")).text();
   py.FS.writeFile("/home/pyodide/engine.py", src);

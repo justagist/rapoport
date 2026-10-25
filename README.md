@@ -18,18 +18,17 @@ Rapoport is a static web app around the [Axelrod](https://github.com/Axelrod-Pyt
 
 There is no server. The page is static files, and the Python that plays the matches runs inside your browser tab through Pyodide, in a background thread. Your strategies, your settings and every result stay in the browser; nothing is uploaded or sent anywhere, and the site keeps no account.
 
-The price is a one-off download on the first visit of about 50 MB, mostly the scientific packages the Axelrod library imports:
+The price is a one-off download on the first visit of about 42 MB, mostly the scientific packages the Axelrod library imports:
 
 | Component | Size |
 | --- | --- |
 | Pyodide core and standard library | 12.5 MB |
 | scipy and openblas | 19.6 MB |
-| matplotlib, pillow, fonttools | 8.8 MB |
 | pandas | 5.7 MB |
 | numpy | 3.1 MB |
 | Axelrod library, editor, fonts | about 1.5 MB |
 
-The service worker keeps all of it, so the next visit loads from the cache in a few seconds, offline too. Starting the Python runtime still takes about 15 seconds each time the page opens.
+The service worker keeps all of it, so the next visit loads from the cache, offline too. Starting the Python runtime and importing the library takes about 7 seconds each time the page opens, and about 10 seconds on the first visit.
 
 ## Run it locally
 

@@ -4,9 +4,54 @@ Runs inside Pyodide in a web worker. Every public function takes and
 returns plain data so the JavaScript side can pass it through JSON.
 """
 
+import inspect
 import random
+import sys
+import types
 
-import axelrod as axl
+# The library imports matplotlib and dask at module level for plotting and
+# for its own result files, neither of which the page uses. Empty stand-ins
+# save about 30 MB of download and a few seconds of import. The names below
+# are the ones its modules touch while being imported (type annotations).
+def _stub(name, **attrs):
+    module = sys.modules.get(name) or types.ModuleType(name)
+    module.__path__ = []
+    module.__dict__.update(attrs)
+    sys.modules[name] = module
+    return module
+
+
+_Figure = type("Figure", (), {})
+_stub("matplotlib", figure=_stub("matplotlib.figure", Figure=_Figure), axes=_stub("matplotlib.axes", SubplotBase=_Figure))
+sys.modules["matplotlib"].pyplot = _stub("matplotlib.pyplot", Figure=_Figure)
+sys.modules["matplotlib"].transforms = _stub("matplotlib.transforms")
+_stub("mpl_toolkits").axes_grid1 = _stub("mpl_toolkits.axes_grid1", make_axes_locatable=None)
+_stub("dask").dataframe = _stub("dask.dataframe")
+
+# Importing the library classifies every strategy by reading the source of
+# every method through inspect.getsource, about 12,000 lookups that each
+# re-parse their module. Caching by the underlying code object makes the
+# import several times faster.
+_getsource = inspect.getsource
+_sources = {}
+
+
+def _cached_getsource(obj):
+    key = getattr(obj, "__func__", obj)
+    key = getattr(key, "__code__", key)
+    try:
+        return _sources[key]
+    except KeyError:
+        pass
+    except TypeError:
+        return _getsource(obj)
+    source = _sources[key] = _getsource(obj)
+    return source
+
+
+inspect.getsource = _cached_getsource
+
+import axelrod as axl  # noqa: E402
 
 LIBRARY = {cls.__name__: cls for cls in axl.strategies}
 USER = {}
@@ -23,7 +68,7 @@ def library():
                 "name": cls.name.replace("$", "").replace("\\", ""),
                 "stochastic": bool(cls.classifier.get("stochastic")),
                 "slow": bool(cls.classifier.get("long_run_time")),
-                "doc": (cls.__doc__ or "").strip().split("\n")[0],
+                "doc": inspect.cleandoc(cls.__doc__ or ""),
             }
         )
     out.sort(key=lambda s: s["name"].lower())

@@ -36,6 +36,8 @@ class Probe(axl.Player):
 def test_library_lists_classics():
     names = {s["name"] for s in engine.library()}
     assert {"Tit For Tat", "Defector", "Cooperator", "Grudger", "phi", "pi", "e"} <= names
+    tft = next(s for s in engine.library() if s["id"] == "TitForTat")
+    assert tft["doc"].startswith("A player starts by cooperating") and "Names:" in tft["doc"]
 
 
 def test_define_registers_and_smokes():
