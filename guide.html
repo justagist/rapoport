@@ -26,32 +26,27 @@
     <div class="title">
       <div>
         <h1>Guide</h1>
-        <p class="finding">How the tournament works, how to run one here, and how to write a strategy of your own.</p>
+        <p class="finding">How to run a tournament and write a strategy, then the background: what the dilemma is and where it shows up in the world.</p>
       </div>
     </div>
+    <nav class="contents" aria-label="Sections of the guide"><a href="#arena">Running a tournament</a><a href="#strategy">Writing a strategy</a><a href="#game">The game</a><a href="#world">Where the dilemma shows up</a><a href="#local">Where it runs</a></nav>
 
     <div class="guide">
       <div class="prose">
-        <section id="game">
-          <h2>The game</h2>
-          <p>Two suspects are held in separate cells. Each can stay silent or confess. If both stay silent, each serves a short sentence. If one confesses and the other stays silent, the confessor walks free and the silent one serves the longest sentence. If both confess, both serve a medium one. Whatever the other does, each suspect is better off confessing. Yet if both follow that logic, both end up worse than if both had stayed silent. That is the prisoner's dilemma.</p>
-          <p>Game theory strips the story down to two moves, cooperate (stay silent) and defect (confess), and scores them as points, the card on the right. In a single round, defecting is the safe choice. Axelrod's question was what happens when the same two players meet turn after turn and each remembers how the other has behaved. In 1980 he invited game theorists to submit strategies as programs and played every one against every other, 200 turns a match. Anatol Rapoport's entry, Tit For Tat, won both of his tournaments: cooperate on the first move, then do whatever the opponent did last. The strategies that did well were nice (never the first to defect), quick to retaliate, quick to forgive, and clear enough for an opponent to learn.</p>
-        </section>
-
         <section id="arena">
           <h2>Running a tournament</h2>
           <ol>
             <li><b>Pick the field.</b> Tick strategies in the roster. The library holds the 240 ordinary strategies of the Axelrod Python library; the search box finds one by name, and the ones marked slow take noticeably longer a match. Your own strategies sit above the library.</li>
             <li><b>Set the scope.</b> Turns is the length of each match. Repetitions plays the whole round-robin that many times; it matters when any strategy is random or noise is on. Noise is the probability that a move is flipped on its way, so 0.05 flips one move in twenty. The seed makes random strategies and noise repeatable: the same field and seed give the same result.</li>
             <li><b>Run.</b> Every pairing plays, including each strategy against a copy of itself, which is how Axelrod scored it.</li>
-            <li><b>Read the matrix.</b> Each cell is the row's payoff a turn against the column, averaged over the repetitions. Rows are ranked by their mean across the whole field, shown at the right. Hover a cell for both players' payoffs, or a name for what the strategy does. Your own strategies are tinted teal.</li>
+            <li><b>Read the matrix.</b> Each cell is the row's payoff a turn against the column, averaged over the repetitions. Rows are ranked by their mean across the whole field, shown at the right. Hover a cell, or hold it on a touch screen, for both players' payoffs; do the same on a name for what the strategy does. Your own strategies are tinted teal.</li>
             <li><b>Watch the tape.</b> Click a cell to see that match move by move: one square a turn, filled for cooperate, hollow for defect, with the final scores. With several repetitions, the numbers above the tape switch between them. A tape longer than the card scrolls sideways.</li>
           </ol>
         </section>
 
         <section id="strategy">
           <h2>Writing a strategy</h2>
-          <p>A strategy is a Python class in the Axelrod library's own form, so anything you write here also runs with the library on your machine. The editor starts with this one:</p>
+          <p>A strategy is a Python class in the Axelrod library's own form, so anything you write here also runs with the library on your machine. The payoffs it plays for are in the card on the right; the editor starts with this one:</p>
 <pre><code>import axelrod as axl
 from axelrod.action import Action
 
@@ -82,9 +77,38 @@ class Probe(axl.Player):
           <p>Your strategies are kept in this browser. <b>Export</b> downloads one as a <code>.py</code> file and <b>Import</b> loads one, which is how to share them or move them between computers.</p>
         </section>
 
+        <section id="game">
+          <h2>The game</h2>
+          <p>Two suspects are held in separate cells. Each can stay silent or confess. If both stay silent, each serves a short sentence. If one confesses and the other stays silent, the confessor walks free and the silent one serves the longest sentence. If both confess, both serve a medium one. Whatever the other does, each suspect is better off confessing. Yet if both follow that logic, both end up worse than if both had stayed silent. That is the prisoner's dilemma.</p>
+          <p>Game theory strips the story down to two moves, cooperate (stay silent) and defect (confess), and scores them as points, the card on the right. In a single round, defecting is the safe choice. Axelrod's question was what happens when the same two players meet turn after turn and each remembers how the other has behaved. In 1980 he invited game theorists to submit strategies as programs and played every one against every other, 200 turns a match. Anatol Rapoport's entry, Tit For Tat, won both of his tournaments: cooperate on the first move, then do whatever the opponent did last. The strategies that did well were nice (never the first to defect), quick to retaliate, quick to forgive, and clear enough for an opponent to learn.</p>
+        </section>
+
+        <section id="world">
+          <h2>Where the dilemma shows up</h2>
+          <p>Game theory is the mathematics of decisions whose outcome depends on what someone else decides. John von Neumann and Oskar Morgenstern set it out in 1944 <a href="#src-1">[1]</a>, and the prisoner's dilemma was written down a few years later at the RAND Corporation, where the live question was nuclear strategy <a href="#src-2">[2]</a>. The United States and the Soviet Union each faced the same choice: build more warheads, or hold back. Whatever the other side did, building looked safer, so both built, and both paid for arsenals that left neither more secure. Only when the two sides treated it as a repeated game, with treaties that could be verified and a breach that could be answered, did the stockpiles start to fall <a href="#src-11">[11]</a>.</p>
+          <p>The same shape turns up wherever two parties meet again and again. Impalas groom ticks off each other's necks, which costs time and attention, and they keep doing it because the same animals will be there tomorrow <a href="#src-5">[5]</a>. Cleaner fish and their clients <a href="#src-6">[6]</a>, and vampire bats that share blood with roost-mates who went hungry <a href="#src-7">[7]</a>, play versions of it. Robert Axelrod and the biologist William Hamilton argued in 1981 that cooperation can evolve among entirely selfish genes once encounters repeat and individuals can recognise each other <a href="#src-4">[4]</a>.</p>
+          <p>It appears among enemies too. In the trenches of 1914 to 1918, units that faced each other for months fell into what the soldiers called live and let live: artillery fired at predictable times at predictable places, snipers missed on purpose, and any breach was answered in kind. Commanders had to order raids and rotate troops to break it <a href="#src-8">[8]</a>. Axelrod devotes a chapter of his book to it <a href="#src-3">[3]</a>, because it shows cooperation arising between people who wanted each other dead, with no agreement and no trust, from the structure of the situation alone.</p>
+          <p>In economics it is two rivals deciding whether to cut prices, two countries deciding whether to raise tariffs, two firms in a cartel deciding whether to cheat on their quota. With many players it becomes the commons: every fishing fleet, every country deciding how much to emit, every neighbour deciding whether to keep the shared garden. And it runs through ordinary life, between colleagues, flatmates, trading partners and nations.</p>
+          <p>What the tournaments add is that none of this is hopeless <a href="#src-9">[9]</a>. Four properties carried the winning strategies: they were nice, never the first to defect; retaliatory, so defection cost something at once; forgiving, so a single lapse did not become a feud; and clear, so the other side could learn what to expect <a href="#src-3">[3]</a>. When moves are sometimes misread, the noise setting here, a little extra generosity keeps feuds from starting <a href="#src-10">[10]</a>. And the whole thing rests on what Axelrod called the shadow of the future: the more likely two parties are to meet again, the more cooperation pays. Most of life is not zero-sum. The arena is a place to see that for yourself, with strategies of your own.</p>
+          <h3>Sources</h3>
+          <ol class="refs">
+            <li id="src-1">J. von Neumann and O. Morgenstern, <i>Theory of Games and Economic Behavior</i>, Princeton University Press, 1944.</li>
+            <li id="src-2">W. Poundstone, <i>Prisoner's Dilemma</i>, Doubleday, 1992. The history of the game's invention by Merrill Flood and Melvin Dresher at RAND in 1950 and its naming by Albert Tucker.</li>
+            <li id="src-3">R. Axelrod, <i>The Evolution of Cooperation</i>, Basic Books, 1984. Chapter 4 covers the live-and-let-live system.</li>
+            <li id="src-4">R. Axelrod and W. D. Hamilton, "The evolution of cooperation", <i>Science</i> 211 (1981), 1390 to 1396. <a href="https://doi.org/10.1126/science.7466396">doi:10.1126/science.7466396</a></li>
+            <li id="src-5">B. L. Hart and L. A. Hart, "Reciprocal allogrooming in impala, <i>Aepyceros melampus</i>", <i>Animal Behaviour</i> 44 (1992), 1073 to 1083. <a href="https://doi.org/10.1016/S0003-3472(05)80319-7">doi:10.1016/S0003-3472(05)80319-7</a></li>
+            <li id="src-6">R. L. Trivers, "The evolution of reciprocal altruism", <i>Quarterly Review of Biology</i> 46 (1971), 35 to 57. <a href="https://doi.org/10.1086/406755">doi:10.1086/406755</a></li>
+            <li id="src-7">G. S. Wilkinson, "Reciprocal food sharing in the vampire bat", <i>Nature</i> 308 (1984), 181 to 184. <a href="https://doi.org/10.1038/308181a0">doi:10.1038/308181a0</a></li>
+            <li id="src-8">T. Ashworth, <i>Trench Warfare 1914 to 1918: The Live and Let Live System</i>, Macmillan, 1980.</li>
+            <li id="src-9">R. Axelrod, "Effective choice in the prisoner's dilemma" and "More effective choice in the prisoner's dilemma", <i>Journal of Conflict Resolution</i> 24 (1980), 3 to 25 and 379 to 403. <a href="https://doi.org/10.1177/002200278002400101">doi:10.1177/002200278002400101</a>, <a href="https://doi.org/10.1177/002200278002400301">doi:10.1177/002200278002400301</a></li>
+            <li id="src-10">J. Wu and R. Axelrod, "How to cope with noise in the iterated prisoner's dilemma", <i>Journal of Conflict Resolution</i> 39 (1995), 183 to 189. <a href="https://doi.org/10.1177/0022002795039001008">doi:10.1177/0022002795039001008</a></li>
+            <li id="src-11">Veritasium, <a href="https://youtu.be/mScpHTIi-kM">"What the Prisoner's Dilemma Reveals About Life, the Universe, and Everything"</a>, video, December 2023. Covers the arms race, the impala example and the effect of noise.</li>
+          </ol>
+        </section>
+
         <section id="local">
           <h2>Where it runs</h2>
-          <p>Python runs inside this tab, through Pyodide, in a background thread so the page stays responsive. The first visit downloads the runtime and the library, about 50 MB; after that it is cached and the page works offline. No strategy, result or keystroke is sent anywhere.</p>
+          <p>Python runs inside this tab, through Pyodide, in a background thread so the page stays responsive. The first visit downloads the runtime and the library, about 42 MB; after that it is cached and the page works offline. No strategy, result or keystroke is sent anywhere.</p>
           <p>Rapoport is named after Anatol Rapoport as a tribute; it has no connection with him or his estate. The engine is the <a href="https://github.com/Axelrod-Python/Axelrod">Axelrod library</a>, the editor is CodeMirror, and the source is at <a href="https://github.com/justagist/rapoport">github.com/justagist/rapoport</a>.</p>
         </section>
       </div>

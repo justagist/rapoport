@@ -116,7 +116,7 @@ h1 { font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: -0.01
 /* results: a ranked matrix with a mean column */
 .matrix { margin-top: 16px; overflow-x: auto; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: pan-x pan-y; }
 /* the one floating thing on the screen, so it carries the one shadow */
-.tip { position: fixed; z-index: 30; max-width: 360px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14); font-size: 13px; line-height: 18px; white-space: pre-line; pointer-events: none; }
+.tip { position: fixed; z-index: 30; max-width: 360px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14); /* taste-skill-ignore: a floating tooltip */ font-size: 13px; line-height: 18px; white-space: pre-line; pointer-events: none; }
 .tip b { font-weight: 500; }
 .tip .doc { color: var(--muted); margin-top: 4px; max-height: 40vh; overflow: hidden; }
 .matrix svg { font-family: inherit; }
@@ -228,6 +228,13 @@ h1 { font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: -0.01
 .guide-wrap { max-width: 954px; margin: 0 auto; }
 .guide { display: grid; grid-template-columns: minmax(0, 1fr) 370px; gap: var(--gap); margin-top: var(--gap); align-items: start; }
 .prose { min-width: 0; }
+.contents { display: flex; flex-wrap: wrap; gap: 4px 20px; margin-top: 16px; }
+.contents a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.prose h3 { font-size: 14px; line-height: 20px; font-weight: 500; margin-top: 20px; }
+.prose .refs { padding-left: 28px; list-style: decimal; margin-top: 8px; }
+.prose .refs li { font-size: 13px; line-height: 20px; color: var(--muted); }
+.prose .refs li + li { margin-top: 6px; }
+.prose section:target h2 { color: var(--accent); }
 .prose section + section { margin-top: 32px; }
 .prose h2 { font-size: 16px; line-height: 20px; font-weight: 500; margin-bottom: 8px; }
 .prose p, .prose li { font-size: 15px; line-height: 24px; }
@@ -238,6 +245,7 @@ h1 { font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: -0.01
 .prose pre { margin: 12px 0; padding: 12px 16px; background: var(--raised); border-radius: 6px; overflow-x: auto; }
 .prose pre code { font: 13px/20px var(--mono); background: none; padding: 0; }
 .prose a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.prose .sources { font-size: 13px; line-height: 20px; color: var(--muted); margin-top: 12px; }
 .side { position: sticky; top: 24px; display: grid; gap: var(--gap); }
 .side .card h2 { margin-bottom: 4px; }
 .side .card .note { margin-top: 10px; }
