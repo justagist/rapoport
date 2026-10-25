@@ -54,7 +54,12 @@ async function run(id, cmd, args) {
   // Nested objects and arrays must become dicts and lists, not JS proxies.
   const kwargs = {};
   for (const [k, v] of Object.entries(args)) kwargs[k] = typeof v === "function" ? v : py.toPy(v);
-  return toJs(engine[cmd].callKwargs(kwargs));
+  const result = engine[cmd].callKwargs(kwargs);
+  try {
+    return toJs(result);
+  } finally {
+    if (result && typeof result.destroy === "function") result.destroy();
+  }
 }
 
 onmessage = async ({ data: { id, cmd, args } }) => {

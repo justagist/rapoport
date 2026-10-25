@@ -12,7 +12,24 @@ Rapoport is a static web app around the [Axelrod](https://github.com/Axelrod-Pyt
 - An editor for your strategies, written the way the library defines them: a `Player` subclass with a `name`, a `classifier` and a `strategy(self, opponent)` method. A check compiles it and plays a smoke match against Tit For Tat.
 - A round-robin tournament with a set number of turns, repetitions, optional noise and a seed. The result is the payoff matrix, ranked, and the move-by-move tape of every match.
 - Your strategies stay in the browser and can be exported and imported as `.py` files.
-- A progressive web app: the runtime (about 50 MB on the first visit) is cached, so later visits are quick and work offline.
+- A progressive web app: the runtime is cached after the first visit, so later visits are quick and work offline.
+
+## Everything runs on your computer
+
+There is no server. The page is static files, and the Python that plays the matches runs inside your browser tab through Pyodide, in a background thread. Your strategies, your settings and every result stay in the browser; nothing is uploaded or sent anywhere, and the site keeps no account.
+
+The price is a one-off download on the first visit of about 50 MB, mostly the scientific packages the Axelrod library imports:
+
+| Component | Size |
+| --- | --- |
+| Pyodide core and standard library | 12.5 MB |
+| scipy and openblas | 19.6 MB |
+| matplotlib, pillow, fonttools | 8.8 MB |
+| pandas | 5.7 MB |
+| numpy | 3.1 MB |
+| Axelrod library, editor, fonts | about 1.5 MB |
+
+The service worker keeps all of it, so the next visit loads from the cache in a few seconds, offline too. Starting the Python runtime still takes about 15 seconds each time the page opens.
 
 ## Run it locally
 
@@ -60,6 +77,7 @@ index.html, app.css, app.js   the arena
 guide.html                    the guide: the game, running a tournament, writing a strategy
 worker.js                     web worker: loads Pyodide and the library, answers engine commands
 py/engine.py                  the Python side: library listing, user strategies, match, tournament
+vendor/editor.js              the CodeMirror editor, bundled once from tools/editor-entry.js
 sw.js, manifest.webmanifest   the progressive web app shell
 tests/test_engine.py          pytest for the engine under CPython
 tests/smoke.mjs               Playwright: runs a tournament in Chromium, then reloads offline
@@ -83,6 +101,13 @@ npm run smoke
 ```
 
 ## Versions
+
+The editor bundle is committed, so visitors and GitHub Pages need no build. To change CodeMirror's version, update `package.json` and run:
+
+```
+npm install
+npm run build:editor
+```
 
 The library is pinned to 4.13.1. Release 4.14.0 imports PyTorch at module level for one strategy, which has no browser build.
 

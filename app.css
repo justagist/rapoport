@@ -26,6 +26,7 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body { margin: 0; background: var(--ground); color: var(--text); font: 14px/20px var(--font); font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; }
 h1, h2, h3, p, ul, ol, pre, figure { margin: 0; }
@@ -48,6 +49,12 @@ a { color: inherit; }
 .nav a[aria-current="page"] { background: var(--active); color: var(--text); }
 .empty a { color: var(--accent); }
 .roster h2 { display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 400; color: var(--muted); margin: 16px 10px 6px; }
+.roster .group { display: flex; align-items: center; margin: 16px 10px 6px; }
+.roster .group h2 { margin: 0; }
+.roster .pending { color: var(--muted); }
+.foot-guide { display: none; color: var(--accent); }
+/* until the library has loaded, its controls are visible but faded and inert */
+.loading .library, .loading .search, .loading .source-pick, .loading #opponent { opacity: 0.45; pointer-events: none; }
 .roster .clear { margin-left: auto; min-height: 0; height: 24px; padding: 0 6px; border: 0; border-radius: 4px; background: none; color: var(--muted); font-size: 12px; }
 .roster .clear:hover { background: var(--active); color: var(--text); }
 .roster .list { display: grid; gap: 2px; }
@@ -91,7 +98,6 @@ select.input { height: var(--control-height); padding: 0 28px 0 10px; border: 1p
 .sheet { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; margin: 0 8px 8px 0; padding: 24px; min-width: 0; }
 .progress { height: 2px; margin: -24px -24px 22px; background: var(--rule); border-radius: 16px 16px 0 0; overflow: hidden; }
 .progress i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 200ms ease; }
-.progress[hidden] { display: none; }
 .title { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 h1 { font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: -0.01em; }
 .finding { color: var(--muted); margin-top: 4px; max-width: 72ch; }
@@ -114,15 +120,22 @@ h1 { font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: -0.01
 .matrix rect.cell:hover { stroke: var(--text); stroke-width: 1; }
 .matrix rect.cell.on { stroke: var(--text); stroke-width: 1.5; }
 
-/* the tape: one square a turn, filled is cooperate, hollow is defect */
-.tape { margin-top: 16px; overflow-x: auto; }
+/* the tape: one square a turn, filled is cooperate, hollow is defect. Names
+   and scores stay put; only the strips scroll when a long match does not fit */
+.tape { margin-top: 16px; }
+.tape-grid { display: grid; grid-template-columns: 140px minmax(0, 1fr) 48px; gap: 12px; align-items: start; }
+.tape-grid.bare { grid-template-columns: minmax(0, 1fr); }
+.tape .whos, .tape .scores { display: grid; }
+.tape .whos span, .tape .scores span { height: 28px; line-height: 28px; }
+.tape .who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tape .who.mine { color: var(--accent); font-weight: 500; }
+.tape .scores { text-align: right; }
+.tape .strips { overflow-x: auto; }
+.tape .strips svg { height: 20px; margin: 4px 0; }
+.tape .axis { display: flex; justify-content: space-between; margin-top: 2px; font-size: 12px; color: var(--muted); }
 .tape .row { display: flex; align-items: center; gap: 12px; height: 28px; }
 .tape .row + .row { margin-top: 4px; }
-.tape .who { width: 140px; flex: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tape .who.mine { color: var(--accent); font-weight: 500; }
-.tape .score { width: 48px; flex: none; text-align: right; }
-.tape svg { flex: none; height: 20px; }
-.tape .axis { display: flex; justify-content: space-between; margin: 6px 0 0 152px; font-size: 12px; color: var(--muted); }
+.reps { display: flex; align-items: center; gap: 8px; }
 .segmented { display: inline-flex; padding: 2px; border-radius: 6px; background: var(--raised); }
 .segmented button { height: 28px; min-width: 28px; padding: 0 8px; border: 0; border-radius: 4px; background: none; color: var(--muted); }
 .segmented button[aria-pressed="true"] { background: var(--surface); color: var(--text); }
@@ -138,8 +151,9 @@ h1 { font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: -0.01
 .tabs .right button:hover { color: var(--text); }
 .source-pick { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--border); color: var(--muted); flex-wrap: wrap; }
 .source-pick select { flex: 1; min-width: 160px; }
-.source-pick[hidden] { display: none; }
-.cm-host { flex: none; }
+/* a fixed basis so the editor never grows with its file, and grow so it fills the card beside the Check card */
+.cm-host { flex: 1 1 340px; min-height: 0; }
+.editor-fail { padding: 16px; color: var(--muted); }
 .cm-editor { height: 100%; font-size: 13px; }
 .cm-editor.cm-focused { outline: none; }
 .cm-scroller { font-family: var(--mono) !important; line-height: 20px; }
@@ -181,15 +195,16 @@ h1 { font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: -0.01
   .roster .settings { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; padding: 0 8px; }
   .roster .settings label { display: grid; gap: 4px; color: var(--muted); }
   .roster .settings input { height: 44px; padding: 0 10px; border: 1px solid var(--control); border-radius: 6px; background: var(--surface); color: var(--text); width: 100%; }
-  .roster .list li, .roster .new, .nav a { height: 44px; }
+  .roster .list li, .roster .new { height: 44px; }
+  .nav { display: none; }
+  .foot-guide { display: inline; }
   .roster .search { height: 44px; }
   .sheet { margin: 0; border-radius: 0; border-width: 1px 0 0; padding: 16px; }
   .progress { margin: -16px -16px 14px; border-radius: 0; }
   .cards { grid-template-columns: minmax(0, 1fr); gap: 16px; margin-top: 16px; }
   .card { padding: 16px; }
-  .tape .who { width: 96px; }
-  .tape .axis { margin-left: 108px; }
-  .cm-host { height: 280px; }
+  .tape-grid { grid-template-columns: 96px minmax(0, 1fr) 40px; gap: 8px; }
+  .cm-host { flex-basis: 280px; }
   .btn, select.input, .tabs button { min-height: 44px; }
   .tabs { height: auto; min-height: 48px; flex-wrap: wrap; }
   .tabs .right { width: 100%; justify-content: flex-end; border-top: 1px solid var(--border); }
@@ -197,7 +212,6 @@ h1 { font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: -0.01
 }
 @media (min-width: 1025px) {
   .roster .settings, .roster .close { display: none; }
-  .cm-host { height: 340px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0.01ms !important; } }
 
@@ -232,10 +246,14 @@ h1 { font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: -0.01
 .payoffs thead th { text-align: right; }
 .payoffs td { text-align: right; padding: 6px 0; border-top: 1px solid var(--rule); font-size: 16px; }
 .payoffs tbody th { border-top: 1px solid var(--rule); }
-.tape.sample { margin-top: 10px; overflow: visible; }
+.tape.sample { margin-top: 10px; }
 .tape.sample .who { width: 80px; }
 .tape.sample svg { flex: 1; min-width: 0; width: auto; height: auto; }
 .side .check { gap: 0; }
+@media (max-width: 480px) {
+  .prose pre { padding: 12px; }
+  .prose pre code { font-size: 12px; }
+}
 @media (max-width: 1024px) {
   .guide { grid-template-columns: minmax(0, 1fr); gap: 16px; }
   .guide-page .sheet { margin: 0; }

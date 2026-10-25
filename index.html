@@ -13,7 +13,7 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"><!-- taste-skill-ignore: the mono is for the code editor -->
 <link rel="stylesheet" href="app.css">
 </head>
-<body>
+<body class="loading">
 <div class="app">
   <aside class="roster" id="roster">
     <div class="mark"><svg viewBox="0 0 22 22" aria-hidden="true"><rect x="1" y="1" width="9" height="9" fill="#1b6c80"/><rect x="12.75" y="1.75" width="7.5" height="7.5" fill="none" stroke="#131416" stroke-width="1.5"/><rect x="1.75" y="12.75" width="7.5" height="7.5" fill="none" stroke="#131416" stroke-width="1.5"/><rect x="12" y="12" width="9" height="9" fill="#1b6c80"/></svg>Rapoport<button class="close" id="close-roster">Close</button></div>
@@ -30,11 +30,11 @@
     <ul class="list" id="mine"></ul>
     <button class="new" id="new-strategy">New strategy</button>
 
-    <h2>Library <span class="count" id="lib-count"></span><button class="clear" id="clear" hidden>Clear selection</button></h2>
+    <div class="group"><h2>Library <span class="count" id="lib-count"></span></h2><button class="clear" id="clear" hidden>Clear selection</button></div>
     <input class="search" id="search" type="search" placeholder="Find a strategy" aria-label="Find a library strategy">
-    <ul class="list library" id="lib"></ul>
+    <ul class="list library" id="lib"><li class="pending">Library still loading</li></ul>
 
-    <p class="foot">Python runs in this tab. Nothing leaves your computer.</p>
+    <p class="foot">Python runs in this tab. Nothing leaves your computer. <a class="foot-guide" href="guide.html">Read the guide.</a></p>
   </aside>
 
   <header class="topbar">
@@ -73,7 +73,7 @@
       <section class="card wide" id="tape-card">
         <header>
           <div><h2 id="tape-title">Match tape</h2><p class="note" id="tape-note">One square a turn. Filled is cooperate, hollow is defect. Click a cell of the matrix to see that pairing.</p></div>
-          <div class="segmented" id="reps" hidden></div>
+          <div class="reps" id="reps-wrap" hidden><span class="note">Repetition</span><div class="segmented" id="reps"></div></div>
         </header>
         <div class="tape" id="tape"></div>
         <p class="empty" id="tape-empty">No match yet.</p>
@@ -99,7 +99,7 @@
         </div>
         <div class="actions">
           <button class="btn primary" id="check-btn" disabled>Check</button>
-          <select class="input" id="opponent" aria-label="Opponent for one match"></select>
+          <select class="input" id="opponent" aria-label="Opponent for one match" disabled><option>Library still loading</option></select>
           <button class="btn" id="play-btn" disabled>Play one match</button>
         </div>
       </section>

@@ -73,7 +73,8 @@ class Probe(axl.Player):
             return D
         if len(self.history) == 1:
             return C
-        return D if opponent.history[-2:] == [D, D] else C</code></pre>
+        last_two = opponent.history[-2:]
+        return D if last_two == [D, D] else C</code></pre>
           <p>Three parts matter. <b>name</b> is what the roster and the matrix show. <b>classifier</b> describes the strategy: set <code>"stochastic": True</code> if it uses randomness, and <code>"memory_depth"</code> to how many past turns it reads, or <code>float("inf")</code> for all of them. <b>strategy</b> is called every turn and returns <code>C</code> or <code>D</code>. The file must define exactly one Player subclass.</p>
           <p>For randomness use <code>self._random</code>, which is seeded by the tournament, rather than the random module, so runs stay repeatable. <code>self._random.random()</code> gives a float and <code>self._random.random_choice(0.9)</code> returns C with that probability.</p>
           <p><b>Check</b> compiles the class and plays twenty turns against Tit For Tat, showing the tape and the scores, or the Python error if it failed. <b>Play one match</b> runs it against any strategy at the current number of turns and shows the tape in the arena.</p>

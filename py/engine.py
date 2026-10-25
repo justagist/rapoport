@@ -19,7 +19,8 @@ def library():
         out.append(
             {
                 "id": key,
-                "name": cls.name,
+                # three strategies carry LaTeX names for the library's plots
+                "name": cls.name.replace("$", "").replace("\\", ""),
                 "stochastic": bool(cls.classifier.get("stochastic")),
                 "slow": bool(cls.classifier.get("long_run_time")),
                 "doc": (cls.__doc__ or "").strip().split("\n")[0],

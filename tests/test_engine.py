@@ -35,7 +35,7 @@ class Probe(axl.Player):
 
 def test_library_lists_classics():
     names = {s["name"] for s in engine.library()}
-    assert {"Tit For Tat", "Defector", "Cooperator", "Grudger"} <= names
+    assert {"Tit For Tat", "Defector", "Cooperator", "Grudger", "phi", "pi", "e"} <= names
 
 
 def test_define_registers_and_smokes():

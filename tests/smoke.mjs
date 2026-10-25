@@ -26,8 +26,10 @@ page.on("pageerror", (e) => failures.push("page error: " + e.message));
 try {
   const t0 = Date.now();
   await page.goto(`http://localhost:${port}/`);
+  check((await page.textContent("#lib")).includes("still loading"), "roster says the library is still loading");
   await page.waitForFunction(() => !document.getElementById("run").disabled, null, { timeout: 240000 });
   console.log(`runtime ready in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+  check(!(await page.$eval("body", (b) => b.classList.contains("loading"))), "loading state clears when the library is listed");
   check((await page.$$("#lib li")).length === 240, "library lists 240 strategies");
 
   // the template strategy checks clean; a broken one shows the error
@@ -35,8 +37,9 @@ try {
   await page.waitForSelector("#check-state.ok");
   check(await page.$("#smoke svg") !== null, "check draws the smoke tape");
   const saved = await page.evaluate(() => localStorage.getItem("rapoport.strategies"));
-  await page.evaluate(() => { const v = document.querySelector(".cm-content"); v.textContent = "x = 1"; v.dispatchEvent(new Event("input")); });
-  await page.waitForTimeout(400);
+  await page.evaluate((v) => { const s = JSON.parse(v); s[0].code = "x = 1"; localStorage.setItem("rapoport.strategies", JSON.stringify(s)); }, saved);
+  await page.reload();
+  await page.waitForFunction(() => !document.getElementById("run").disabled, null, { timeout: 240000 });
   await page.click("#check-btn");
   await page.waitForSelector("#check-state.bad");
   check((await page.textContent("#check-body")).includes("exactly one"), "a broken strategy shows the Python error");
@@ -65,8 +68,12 @@ try {
   await page.waitForSelector("#matrix svg", { timeout: 120000 });
   check((await page.$$("#matrix rect.cell")).length === 16, "matrix has 4 x 4 cells");
   check((await page.textContent("#finding")).includes("leads at"), "finding line names the leader");
-  check((await page.$$("#tape .row svg")).length === 2, "tape draws two rows");
-  check(!(await page.$eval("#reps", (e) => e.hidden)), "repetition selector shows for 2 repetitions");
+  check((await page.$$("#tape .strips svg")).length === 2, "tape draws two strips");
+  check(!(await page.$eval("#reps-wrap", (e) => e.hidden)), "repetition selector shows for 2 repetitions");
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await page.waitForTimeout(300);
+  check((await page.$eval("#tape .scores span", (e) => e.getBoundingClientRect().right)) <= 768, "tape scores stay in view at 768 wide");
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.click("#matrix rect.cell[data-i='1'][data-j='2']");
   check((await page.textContent("#tape-title")) !== "", "clicking a cell selects a pairing");
 
