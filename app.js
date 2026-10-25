@@ -37,7 +37,8 @@ function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").
 // The service worker should control the page before the runtime download
 // starts, so the first files are cached for the next visit. It must not hold
 // the page up if it fails to install, so wait for it three seconds at most.
-if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
+// A secure context covers https, localhost and 127.0.0.1; the worker never registers from file://.
+if ("serviceWorker" in navigator && window.isSecureContext) {
   await Promise.race([
     navigator.serviceWorker.register("sw.js").then(() => navigator.serviceWorker.ready).catch(() => {}),
     new Promise((resolve) => setTimeout(resolve, 3000)),
@@ -555,6 +556,47 @@ function drawTape(host, names, moves, scores, mine, { labels }) {
   const cue = host.parentElement.querySelector(".tape-cue");
   if (cue) { const shown = Math.floor(strips.clientWidth / sq); cue.hidden = shown >= n; cue.textContent = `Turns 1 to ${shown} of ${n} are in view. Scroll the strips sideways for the rest.`; }
 }
+
+// ---------- the guide and background as an overlay ----------
+// Navigating to guide.html would destroy the worker and its interpreter, so
+// the arena fetches the page and shows its content in a dialog instead. The
+// doc's name goes in the URL hash so the back button closes it.
+const docCache = {};
+const docTitle = { guide: "Guide", background: "Background" };
+async function openDoc(name, anchor) {
+  if (!docCache[name]) {
+    const html = await (await fetch(`${name}.html`)).text();
+    docCache[name] = new DOMParser().parseFromString(html, "text/html").querySelector(".guide-wrap").innerHTML;
+  }
+  const dialog = $("doc");
+  $("doc-body").innerHTML = docCache[name];
+  $("doc-title").textContent = docTitle[name];
+  $("doc-page").href = `${name}.html`;
+  if (!dialog.open) dialog.showModal();
+  dialog.scrollTop = 0;
+  const target = anchor && $("doc-body").querySelector(anchor);
+  if (target) target.scrollIntoView();
+  if (location.hash !== `#${name}`) history.pushState(null, "", `#${name}`);
+}
+function closeDoc() {
+  if ($("doc").open) $("doc").close();
+  if (docTitle[location.hash.slice(1)]) history.pushState(null, "", location.pathname + location.search);
+}
+document.addEventListener("click", (e) => {
+  const a = e.target.closest("a[href]");
+  if (!a) return;
+  if (a.dataset.doc) { e.preventDefault(); openDoc(a.dataset.doc, a.dataset.anchor); return; }
+  if (!a.closest("#doc-body")) return;
+  const href = a.getAttribute("href");
+  const doc = href.match(/^(guide|background)\.html(#.*)?$/);
+  if (doc) { e.preventDefault(); openDoc(doc[1], doc[2]); }
+  else if (href === "./") { e.preventDefault(); closeDoc(); }
+  else if (href.startsWith("#")) { e.preventDefault(); $("doc-body").querySelector(href)?.scrollIntoView(); }
+});
+$("doc-close").addEventListener("click", closeDoc);
+$("doc").addEventListener("close", closeDoc);
+window.addEventListener("popstate", () => { const name = location.hash.slice(1); docTitle[name] ? openDoc(name) : $("doc").open && $("doc").close(); });
+if (docTitle[location.hash.slice(1)]) openDoc(location.hash.slice(1));
 
 // ---------- boot ----------
 drawMine(); drawTabs();

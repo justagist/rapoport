@@ -28,10 +28,10 @@ async function init(id) {
   step("Loading the Python runtime");
   py = await loadPyodide({ indexURL: PYODIDE });
   for (const w of WHEELS) {
-    step(`Fetching ${w}`);
+    step(`Loading ${w}`);
     await py.loadPackage(w, { messageCallback: () => {} });
   }
-  step("Fetching the Axelrod library");
+  step("Loading the Axelrod library");
   await py.loadPackage(AXELROD, { messageCallback: () => {} });
   step("Starting the engine");
   const src = await (await fetch("py/engine.py")).text();

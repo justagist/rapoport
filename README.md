@@ -38,7 +38,9 @@ Any static server works. Pyodide needs a real origin rather than `file://`.
 python3 -m http.server 8000
 ```
 
-Then open http://localhost:8000/.
+Then open http://localhost:8000/ (or 127.0.0.1; a `file://` URL cannot run the service worker or Pyodide).
+
+Leaving the arena page and coming back restarts the Python runtime, which takes about 7 s even from the cache, so from the arena the guide and background open in an overlay rather than as a navigation. Both are also plain pages at `guide.html` and `background.html`.
 
 ## Write a strategy
 
