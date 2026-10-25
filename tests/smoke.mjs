@@ -77,9 +77,11 @@ try {
   await page.click("#matrix rect.cell[data-i='1'][data-j='2']");
   check((await page.textContent("#tape-title")) !== "", "clicking a cell selects a pairing");
   await page.hover("#matrix rect.cell[data-i='0'][data-j='1']");
-  check(!(await page.$eval("#tip", (e) => e.hidden)) && (await page.textContent("#tip")).includes("against"), "hovering a cell shows the tooltip");
-  await page.hover("#matrix text[data-tip]");
-  check((await page.textContent("#tip")).includes("Names:"), "hovering a name shows the whole docstring");
+  const cellTip = await page.$eval("#tip", (e) => ({ hidden: e.hidden, title: e.querySelector("b").textContent, body: e.querySelector(".doc").textContent }));
+  check(!cellTip.hidden && cellTip.title.includes("against") && cellTip.body.includes("a turn for"), "hovering a cell shows a titled tooltip with both payoffs");
+  await page.hover("#matrix text[data-tip-title]");
+  const nameTip = await page.$eval("#tip .doc", (e) => e.textContent);
+  check(nameTip.length > 20 && !nameTip.includes("undefined") && !nameTip.includes("Names:"), "hovering a name shows the docstring's first paragraph");
   await page.mouse.move(0, 0);
   check(await page.$eval("#tip", (e) => e.hidden), "leaving the matrix hides the tooltip");
   // a finger hold shows the same tooltip
@@ -92,6 +94,21 @@ try {
   await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
   await page.waitForTimeout(100);
   check(await page.$eval("#tip", (e) => e.hidden), "lifting the finger hides it");
+  await page.focus("#matrix rect.cell[data-i='2'][data-j='0']");
+  await page.keyboard.press("Enter");
+  check((await page.textContent("#tape-title")).startsWith((await page.$$eval("#mine li span, #lib li span", () => ""), "")) && (await page.$("#matrix rect.cell.on[data-i='2'][data-j='0']")) !== null, "Enter on a focused cell selects it");
+  // keyboard order and the folded roster
+  const order = await page.evaluate(() => { const ids = []; let el = document.body; for (let k = 0; k < 8; k++) { el = (() => { const all = [...document.querySelectorAll("a, button, input, select, [tabindex='0']")].filter((e) => !e.closest("[inert]") && e.offsetParent !== null && !e.disabled); return all[k]; })(); if (el) ids.push(el.id || el.className || el.tagName); } return ids; });
+  check(order.indexOf("run") >= 0 && order.indexOf("run") < 6, "Run is within the first six tabbable controls");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(300);
+  check(await page.$eval("#roster", (e) => e.inert), "the folded roster is inert while closed");
+  check((await page.textContent("#status-sheet")).includes("matches"), "the status shows on the sheet at phone width");
+  await page.click("#menu");
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+  check(!(await page.$eval("#roster", (e) => e.classList.contains("open"))), "Escape closes the roster");
+  await page.setViewportSize({ width: 1440, height: 900 });
   await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: false });
 
   // strategies survive a reload

@@ -104,14 +104,15 @@ function field() {
 }
 
 // ---------- status ----------
-function status(text) { $("status").textContent = text; }
+let statusError = null;   // a refusal or failure that the estimate must not overwrite
+function status(text) { $("status").textContent = text; $("status-sheet").textContent = text; }
 function progress(done, total) {
   const el = $("progress");
   el.hidden = done === null;
-  if (done !== null) el.firstElementChild.style.width = `${(100 * done) / total}%`;
+  if (done !== null) el.firstElementChild.style.width = `${Math.max(3, (100 * done) / total)}%`;
 }
 function drawEstimate() {
-  if (!ready || running) return;
+  if (!ready || running || statusError) return;
   const n = field().length, { repetitions } = settings();
   status(n < 2 ? "Pick at least two strategies." : `${((n * (n + 1)) / 2) * repetitions} matches to play.`);
 }
@@ -128,8 +129,8 @@ function drawMine() {
 function drawLibrary() {
   const q = $("search").value.trim().toLowerCase();
   const rows = library.filter((s) => !q || s.name.toLowerCase().includes(q));
-  $("lib").innerHTML = rows.map((s) => `<li><label><input type="checkbox" data-id="${s.id}" ${selected.has(s.id) ? "checked" : ""}><span title="${esc(s.doc)}">${esc(s.name)}</span></label>${s.slow ? '<span class="tag">slow</span>' : ""}</li>`).join("")
-    || `<li><span class="tag">Nothing matches.</span></li>`;
+  $("lib").innerHTML = rows.map((s) => `<li><label><input type="checkbox" data-id="${s.id}" ${selected.has(s.id) ? "checked" : ""}><span>${esc(s.name)}</span></label>${s.slow ? '<span class="tag">slow</span>' : ""}</li>`).join("")
+    || `<li class="pending">Nothing matches.</li>`;
 }
 $("search").addEventListener("input", drawLibrary);
 document.querySelector(".roster").addEventListener("change", (e) => {
@@ -150,20 +151,32 @@ $("new-strategy").addEventListener("click", () => {
   selected.add(s.id); store.selected = [...selected];
   drawMine(); drawOpponents(); openTab(s.id); closeRoster(); drawEstimate();
 });
-$("menu").addEventListener("click", () => { const open = !$("roster").classList.contains("open"); $("roster").classList.toggle("open", open); $("menu").setAttribute("aria-expanded", String(open)); });
-function closeRoster() { $("roster").classList.remove("open"); $("menu").setAttribute("aria-expanded", "false"); }
+const folded = matchMedia("(max-width: 1024px)");
+function setRoster(open) {
+  $("roster").classList.toggle("open", open);
+  $("roster").inert = folded.matches && !open;
+  $("menu").setAttribute("aria-expanded", String(open));
+}
+$("menu").addEventListener("click", () => { setRoster(!$("roster").classList.contains("open")); if ($("roster").classList.contains("open")) $("close-roster").focus(); });
+function closeRoster() { const was = $("roster").classList.contains("open"); setRoster(false); if (was && folded.matches) $("menu").focus(); }
 $("close-roster").addEventListener("click", closeRoster);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("roster").classList.contains("open")) closeRoster(); });
+folded.addEventListener("change", () => setRoster($("roster").classList.contains("open")));
+setRoster(false);
 
 // ---------- editor ----------
-let view = null, EditorState = null, EditorView = null, readOnly = null;
+let view = null, EditorState = null, EditorView = null, readOnly = null, wrapping = null;
+const narrowEditor = matchMedia("(max-width: 640px)");
 async function mountEditor() {
   try {
     const cm = await editorLoading;
-    EditorView = cm.EditorView; EditorState = cm.EditorState; readOnly = new cm.Compartment();
+    EditorView = cm.EditorView; EditorState = cm.EditorState; readOnly = new cm.Compartment(); wrapping = new cm.Compartment();
+    const wrap = () => (narrowEditor.matches ? EditorView.lineWrapping : []);
     view = new EditorView({
       parent: $("cm"),
-      state: EditorState.create({ doc: "", extensions: [cm.basicSetup, cm.python(), readOnly.of([]), EditorView.updateListener.of((u) => { if (u.docChanged && current !== "source") saveCode(); })] }),
+      state: EditorState.create({ doc: "", extensions: [cm.basicSetup, cm.python(), readOnly.of([]), wrapping.of(wrap()), EditorView.updateListener.of((u) => { if (u.docChanged && current !== "source") saveCode(); })] }),
     });
+    narrowEditor.addEventListener("change", () => view.dispatch({ effects: wrapping.reconfigure(wrap()) }));
     return true;
   } catch {
     $("cm").innerHTML = `<p class="editor-fail">The code editor did not load. Reload to try again. Saved strategies still run.</p>`;
@@ -189,7 +202,8 @@ function drawTabs() {
     + `<div class="right"><button id="export" title="Download this strategy as a .py file">Export</button><button id="import">Import</button><button id="delete">Delete</button></div>`;
   const own = current !== "source";
   $("export").hidden = !own; $("delete").hidden = !own || strategies.length === 1;
-  $("check-btn").disabled = !ready || !own || !view; $("play-btn").disabled = !ready || !own || !view;
+  $("check-btn").disabled = !ready || !view; $("play-btn").disabled = !ready || !view;
+  $("check-actions").hidden = !own;
   $("source-pick").hidden = own;
 }
 $("tabs").addEventListener("click", (e) => {
@@ -263,6 +277,7 @@ function deleteCurrent() {
 // ---------- check ----------
 async function define(s) {
   const info = await call("define", { uid: s.id, code: s.code });
+  if (statusError) { statusError = null; drawEstimate(); }
   if (info.name !== s.name) { s.name = info.name; store.strategies = strategies; drawMine(); drawTabs(); drawOpponents(); }
   return info;
 }
@@ -295,6 +310,7 @@ $("play-btn").addEventListener("click", async () => {
     const m = await call("match", { a: { kind: "user", id: s.id }, b: oppSpec, turns, noise, seed });
     showCheck(info);
     tapeSel = { names: [info.name, nameOf(oppSpec)], moves: m.moves, scores: m.scores, mine: [true, oppSpec.kind === "user"], turns };
+    if (result) drawMatrix();
     drawTapeCard();
     $("tape-card").scrollIntoView({ block: "nearest" });
   } catch (e) { showCheck(null, e.message); }
@@ -315,13 +331,15 @@ $("run").addEventListener("click", runTournament);
 async function runTournament() {
   const specs = field();
   if (specs.length < 2) { status("Pick at least two strategies."); return; }
+  const invalid = [...document.querySelectorAll(".topbar [data-setting]")].find((i) => !i.validity.valid);
+  if (invalid) { status(`${invalid.parentElement.firstChild.textContent.trim()} must be between ${invalid.min} and ${invalid.max || "any number"}.`); return; }
   const opts = settings();
   running = true; $("run").disabled = true;
   const t0 = performance.now();
   try {
     for (const spec of specs.filter((s) => s.kind === "user")) {
       const s = strategies.find((x) => x.id === spec.id);
-      try { await define(s); } catch (e) { openTab(s.id); showCheck(null, e.message); status(`${s.name} did not run.`); return; }
+      try { await define(s); } catch (e) { openTab(s.id); showCheck(null, e.message); statusError = `${s.name} did not run. See the Check card.`; status(statusError); $("check").scrollIntoView({ block: "nearest" }); return; }
     }
     progress(0, 1); status("Playing the first match");
     const r = await call("tournament", { specs, ...opts }, ([done, total]) => { progress(done, total); status(`Match ${done} of ${total}`); });
@@ -330,7 +348,7 @@ async function runTournament() {
     tapeSel = firstMine >= 0 && firstMine !== leader ? { i: firstMine, j: leader, rep: 0 } : { i: leader, j: result.ranking[1], rep: 0 };
     drawResults();
   } catch (e) {
-    status("The tournament failed.");
+    statusError = "The tournament failed."; status(statusError);
     $("results-empty").hidden = false; $("results-empty").textContent = e.message;
   } finally {
     progress(null); running = false; $("run").disabled = false; drawEstimate();
@@ -366,58 +384,89 @@ function drawResults() {
   drawTapeCard();
 }
 
+const measure = document.createElement("canvas").getContext("2d");
+function textWidth(text, font) { measure.font = font; return measure.measureText(text).width; }
+// cut from the middle so a distinguishing suffix survives ("Adaptive Pav…2011")
+function clip(name, maxWidth, font) {
+  if (textWidth(name, font) <= maxWidth) return name;
+  let keep = name.length - 1;
+  while (keep > 4 && textWidth(name.slice(0, Math.ceil(keep / 2)) + "…" + name.slice(-Math.floor(keep / 2)), font) > maxWidth) keep--;
+  return name.slice(0, Math.ceil(keep / 2)) + "…" + name.slice(-Math.floor(keep / 2));
+}
+const firstParagraph = (doc) => doc.split(/\n\s*\n/)[0].replace(/\s+/g, " ");
+
 function drawMatrix() {
   const r = result, order = r.ranking, n = order.length;
   const host = $("matrix");
   const width = host.clientWidth || 1100;
-  const narrow = width < 520, label = narrow ? 124 : 160, scoreW = 52, gap = 24, minBar = 120;
-  const cell = Math.max(28, Math.min(44, Math.floor((width - label - gap - minBar - scoreW) / n)));
-  // the mean bar takes whatever width the cells leave, so the figure ends on the card's edge
-  const w = Math.max(width, label + n * cell + gap + minBar + scoreW);
-  const barX = label + n * cell + gap, barW = w - barX - scoreW - 12;
+  const narrow = width < 640, nameFont = "13px IBM Plex Sans, Inter, system-ui, sans-serif";
+  // the name column fits the longest name up to a cap, and is never the column that loses width
+  const nameMax = narrow ? 120 : 220;
+  const label = 28 + Math.min(nameMax, Math.max(...r.names.map((x) => textWidth(x, nameFont)))) + 12;
+  const scoreW = 52, gap = 24, minBar = 120;
+  // on a phone the mean sits beside the names, so the leaderboard is in view while the cells scroll
+  const cellsX = narrow ? label + scoreW + 12 : label;
+  const cell = Math.max(28, Math.min(44, Math.floor((width - cellsX - (narrow ? 0 : gap + minBar + scoreW)) / n)));
+  const w = Math.max(width, cellsX + n * cell + (narrow ? 0 : gap + minBar + scoreW));
+  const barX = cellsX + n * cell + gap, barW = w - barX - scoreW - 12;
+  const scoreX = narrow ? label + scoreW - 8 : w;
   const top = 24, h = top + n * cell;
   // light ramps so ink figures hold their contrast on every cell
   const fill = (v, mine) => mine ? `rgba(27,108,128,${0.08 + (v / 5) * 0.45})` : `rgba(19,20,22,${0.04 + (v / 5) * 0.3})`;
-  const max = narrow ? 13 : 18, short = (name) => (name.length > max ? name.slice(0, max - 1) + "…" : name);
+  const wins = (x) => (Number.isInteger(x) ? String(x) : x.toFixed(1));
   let s = `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="Payoff per turn of each strategy against each other, ranked">`;
   order.forEach((i, ri) => {
     const mine = r.mine[i], y = top + ri * cell, rankNo = ri + 1;
-    const about = tipText(r.names[i], r.mine[i] ? "Your strategy." : r.docs[i] || "From the Axelrod library.");
-    const summary = tipText(`${r.names[i]}: ${ordinal(rankNo)} of ${n}`, `${f2(r.scores[i])} a turn on average. Won ${r.wins[i].toFixed(1)} of ${n - 1} matches a repetition. Cooperated ${Math.round(100 * r.cooperation[i])}% of the time.`);
+    const about = tipAttrs(r.names[i], r.mine[i] ? "Your strategy." : firstParagraph(r.docs[i]) || "From the Axelrod library.");
+    const summary = tipAttrs(`${r.names[i]}: ${ordinal(rankNo)} of ${n}`, `${f2(r.scores[i])} a turn on average. Won ${wins(r.wins[i])} of ${n - 1} matches a repetition. Cooperated ${Math.round(100 * r.cooperation[i])}% of the time.`);
     // rows and columns share the rank order, so the rank number heads the column
     s += `<text x="4" y="${y + cell / 2 + 4}" font-size="12" fill="${MUTED}" style="font-variant-numeric:tabular-nums">${rankNo}</text>`;
-    s += `<text data-tip="${about}" x="${label - 10}" y="${y + cell / 2 + 4}" text-anchor="end" font-size="13" fill="${mine ? ACCENT : INK}" font-weight="${mine ? 600 : 400}">${esc(short(r.names[i]))}</text>`;
-    s += `<text data-tip="${about}" x="${label + ri * cell + cell / 2}" y="${top - 8}" text-anchor="middle" font-size="12" fill="${mine ? ACCENT : MUTED}" font-weight="${mine ? 600 : 400}" style="font-variant-numeric:tabular-nums">${rankNo}</text>`;
+    s += `<text ${about} x="${label - 10}" y="${y + cell / 2 + 4}" text-anchor="end" font-size="13" fill="${mine ? ACCENT : INK}" font-weight="${mine ? 600 : 400}">${esc(clip(r.names[i], nameMax, nameFont))}</text>`;
+    s += `<text ${about} x="${cellsX + ri * cell + cell / 2}" y="${top - 8}" text-anchor="middle" font-size="12" fill="${mine ? ACCENT : MUTED}" font-weight="${mine ? 600 : 400}" style="font-variant-numeric:tabular-nums">${rankNo}</text>`;
     order.forEach((j, ci) => {
       const v = r.payoff[i][j], on = tapeSel && tapeSel.i === i && tapeSel.j === j;
-      const pair = i === j ? tipText(`${r.names[i]} against itself`, `${f2(v)} a turn each.`) : tipText(`${r.names[i]} against ${r.names[j]}`, `${f2(v)} a turn for ${r.names[i]}, ${f2(r.payoff[j][i])} for ${r.names[j]}. Tap to see the tape.`);
-      s += `<rect class="cell${on ? " on" : ""}" data-tip="${pair}" data-i="${i}" data-j="${j}" x="${label + ci * cell + 1}" y="${y + 1}" width="${cell - 2}" height="${cell - 2}" rx="2" fill="${fill(v, mine || r.mine[j])}"/>`;
-      s += `<text pointer-events="none" x="${label + ci * cell + cell / 2}" y="${y + cell / 2 + 4}" text-anchor="middle" font-size="12" fill="${INK}" style="font-variant-numeric:tabular-nums">${f2(v)}</text>`;
+      const pair = i === j ? tipAttrs(`${r.names[i]} against itself`, `${f2(v)} a turn each.`) : tipAttrs(`${r.names[i]} against ${r.names[j]}`, `${f2(v)} a turn for ${r.names[i]}, ${f2(r.payoff[j][i])} for ${r.names[j]}. Select to see the tape.`);
+      s += `<rect class="cell${on ? " on" : ""}" ${pair} tabindex="0" role="button" aria-label="${esc(r.names[i])} against ${esc(r.names[j])}, ${f2(v)} a turn" data-i="${i}" data-j="${j}" x="${cellsX + ci * cell + 1}" y="${y + 1}" width="${cell - 2}" height="${cell - 2}" rx="2" fill="${fill(v, mine || r.mine[j])}"/>`;
+      s += `<text pointer-events="none" x="${cellsX + ci * cell + cell / 2}" y="${y + cell / 2 + 4}" text-anchor="middle" font-size="${cell < 34 ? 11 : 12}" fill="${INK}" style="font-variant-numeric:tabular-nums">${f2(v)}</text>`;
     });
-    s += `<g data-tip="${summary}"><rect x="${barX}" y="${y}" width="${w - barX}" height="${cell}" fill="transparent"/>`;
-    s += `<rect x="${barX}" y="${y + cell / 2 - 1}" width="${barW}" height="2" fill="#f0f1f2"/>`;
-    s += `<rect x="${barX}" y="${y + cell / 2 - 1}" width="${(barW * r.scores[i]) / 5}" height="2" fill="${mine ? ACCENT : "#9aa0a3"}"/>`;
-    s += `<text x="${w}" y="${y + cell / 2 + 4}" text-anchor="end" font-size="13" fill="${INK}" style="font-variant-numeric:tabular-nums">${f2(r.scores[i])}</text></g>`;
+    s += `<g ${summary}>`;
+    if (narrow) {
+      s += `<rect x="${label}" y="${y}" width="${scoreW}" height="${cell}" fill="transparent"/>`;
+    } else {
+      s += `<rect x="${barX}" y="${y}" width="${w - barX}" height="${cell}" fill="transparent"/>`;
+      s += `<rect x="${barX}" y="${y + cell / 2 - 1}" width="${barW}" height="2" fill="#f0f1f2"/>`;
+      s += `<rect x="${barX}" y="${y + cell / 2 - 1}" width="${(barW * r.scores[i]) / 5}" height="2" fill="${mine ? ACCENT : "#9aa0a3"}"/>`;
+    }
+    s += `<text x="${scoreX}" y="${y + cell / 2 + 4}" text-anchor="end" font-size="13" fill="${INK}" style="font-variant-numeric:tabular-nums">${f2(r.scores[i])}</text></g>`;
   });
-  s += `<text x="${barX}" y="${top - 8}" font-size="12" fill="${MUTED}">Mean a turn, out of 5</text>`;
+  s += narrow
+    ? `<text x="${scoreX}" y="${top - 8}" text-anchor="end" font-size="12" fill="${MUTED}">Mean</text>`
+    : `<text x="${barX}" y="${top - 8}" font-size="12" fill="${MUTED}">Mean a turn, out of 5</text>`;
   s += `</svg>`;
   host.innerHTML = s;
 }
-$("matrix").addEventListener("click", (e) => {
-  const c = e.target.closest("rect.cell");
-  if (!c) return;
+function selectCell(c) {
   tapeSel = { i: +c.dataset.i, j: +c.dataset.j, rep: 0 };
   drawMatrix(); drawTapeCard();
+}
+$("matrix").addEventListener("keydown", (e) => {
+  const c = e.target.closest("rect.cell");
+  if (c && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); selectCell(c); }
+});
+$("matrix").addEventListener("click", (e) => {
+  if (heldTip) { heldTip = false; return; }   // a hold that showed the tooltip is not a tap
+  const c = e.target.closest("rect.cell");
+  if (c) selectCell(c);
 });
 
 // Details for the matrix: a tooltip on hover with a mouse, on a hold with a
 // finger. The text is stored on the element as a title line and a body.
-function tipText(title, body) { return esc(`${title}\u0000${body}`); }
+function tipAttrs(title, body) { return `data-tip-title="${esc(title)}" data-tip-body="${esc(body)}"`; }
 const tip = $("tip");
-let holdTimer = null, holdStart = null;
+let holdTimer = null, holdStart = null, heldTip = false;
 function showTip(el, x, y, touch) {
-  const [title, body] = el.dataset.tip.split("\u0000");
-  tip.innerHTML = `<b>${esc(title)}</b><div class="doc">${esc(body)}</div>`;
+  tip.innerHTML = `<b>${esc(el.dataset.tipTitle)}</b><div class="doc">${esc(el.dataset.tipBody)}</div>`;
+  if (touch) heldTip = true;
   tip.hidden = false;
   const { width, height } = tip.getBoundingClientRect(), vw = innerWidth, vh = innerHeight;
   let left = touch ? x - width / 2 : x + 14, top = touch ? y - height - 28 : y + 14;
@@ -431,18 +480,19 @@ function hideTip() { tip.hidden = true; clearTimeout(holdTimer); holdTimer = nul
 const matrix = $("matrix");
 matrix.addEventListener("pointerover", (e) => {
   if (e.pointerType !== "mouse") return;
-  const el = e.target.closest("[data-tip]");
+  const el = e.target.closest("[data-tip-title]");
   el ? showTip(el, e.clientX, e.clientY, false) : hideTip();
 });
 matrix.addEventListener("pointermove", (e) => {
-  if (e.pointerType === "mouse") { if (!tip.hidden) { const el = e.target.closest("[data-tip]"); el && showTip(el, e.clientX, e.clientY, false); } return; }
+  if (e.pointerType === "mouse") { if (!tip.hidden) { const el = e.target.closest("[data-tip-title]"); el && showTip(el, e.clientX, e.clientY, false); } return; }
   if (holdStart && Math.hypot(e.clientX - holdStart.x, e.clientY - holdStart.y) > 8) hideTip();
 });
 matrix.addEventListener("pointerleave", hideTip);
 matrix.addEventListener("pointerdown", (e) => {
   if (e.pointerType === "mouse") return;
-  const el = e.target.closest("[data-tip]");
+  const el = e.target.closest("[data-tip-title]");
   if (!el) return;
+  heldTip = false;
   holdStart = { x: e.clientX, y: e.clientY };
   clearTimeout(holdTimer);
   holdTimer = setTimeout(() => showTip(el, e.clientX, e.clientY, true), 400);
@@ -469,7 +519,7 @@ function drawTapeCard() {
   const [a, b] = scores;
   const verdict = a === b ? "a draw" : a > b ? `${esc(names[0])} ahead by ${a - b}` : `${esc(names[1])} ahead by ${b - a}`;
   const coops = (moves[0] + moves[1]).split("").filter((c) => c === "C").length;
-  $("tape-note").innerHTML = `${turns} turns · <b>${a} to ${b}</b>, ${verdict} · ${coops} of ${2 * turns} moves cooperated. Filled is cooperate, hollow is defect.`;
+  $("tape-note").innerHTML = `${"moves" in tapeSel && r ? "A single match, not part of the tournament above · " : ""}${turns} turns · <b>${a} to ${b}</b>, ${verdict} · ${coops} of ${2 * turns} moves cooperated. Filled is cooperate, hollow is defect.`;
   $("reps-wrap").hidden = reps < 2;
   if (reps >= 2) $("reps").innerHTML = Array.from({ length: reps }, (_, k) => `<button aria-pressed="${k === tapeSel.rep}" data-rep="${k}" aria-label="Repetition ${k + 1}">${k + 1}</button>`).join("");
   drawTape($("tape"), names, moves, scores, mine, { labels: true });
@@ -502,6 +552,8 @@ function drawTape(host, names, moves, scores, mine, { labels }) {
     return s + `</svg>`;
   };
   strips.innerHTML = row(moves[0]) + row(moves[1]) + (labels ? `<div class="axis num" style="width:${w}px"><span>turn 1</span><span>turn ${n}</span></div>` : "");
+  const cue = host.parentElement.querySelector(".tape-cue");
+  if (cue) { const shown = Math.floor(strips.clientWidth / sq); cue.hidden = shown >= n; cue.textContent = `Turns 1 to ${shown} of ${n} are in view. Scroll the strips sideways for the rest.`; }
 }
 
 // ---------- boot ----------
