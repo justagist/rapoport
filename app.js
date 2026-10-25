@@ -360,7 +360,7 @@ function drawResults() {
   }
   $("finding").innerHTML = finding;
   $("stamp").textContent = `${n} strategies · ${r.turns} turns · ${r.repetitions} repetition${r.repetitions === 1 ? "" : "s"}${r.noise ? ` · noise ${r.noise}` : ""} · seed ${r.seed} · ${r.seconds.toFixed(1)} s`;
-  $("results-note").innerHTML = `Mean over ${r.repetitions} repetition${r.repetitions === 1 ? "" : "s"} of ${r.turns} turns. Mutual cooperation pays 3, mutual defection 1, a sucker 0 and a cheat 5. Rows are ranked by their mean; a column's number is the rank of that strategy.`;
+  $("results-note").innerHTML = `Mean over ${r.repetitions} repetition${r.repetitions === 1 ? "" : "s"} of ${r.turns} turns. Mutual cooperation pays 3, mutual defection 1, a sucker 0 and a cheat 5. Rows are ranked by their mean; a column's number is the rank of that strategy. Hover or hold a name, a cell or a mean for details.`;
   $("results-empty").hidden = true;
   drawMatrix();
   drawTapeCard();
@@ -382,19 +382,19 @@ function drawMatrix() {
   let s = `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="Payoff per turn of each strategy against each other, ranked">`;
   order.forEach((i, ri) => {
     const mine = r.mine[i], y = top + ri * cell, rankNo = ri + 1;
-    const about = `${r.names[i]}: ${r.mine[i] ? "your strategy" : r.docs[i] || "from the Axelrod library"}`;
-    const summary = `${r.names[i]} is ${ordinal(rankNo)} of ${n}: ${f2(r.scores[i])} a turn on average, won ${r.wins[i].toFixed(1)} of ${n - 1} matches a repetition, cooperated ${Math.round(100 * r.cooperation[i])}% of the time`;
+    const about = tipText(r.names[i], r.mine[i] ? "Your strategy." : r.docs[i] || "From the Axelrod library.");
+    const summary = tipText(`${r.names[i]}: ${ordinal(rankNo)} of ${n}`, `${f2(r.scores[i])} a turn on average. Won ${r.wins[i].toFixed(1)} of ${n - 1} matches a repetition. Cooperated ${Math.round(100 * r.cooperation[i])}% of the time.`);
     // rows and columns share the rank order, so the rank number heads the column
     s += `<text x="4" y="${y + cell / 2 + 4}" font-size="12" fill="${MUTED}" style="font-variant-numeric:tabular-nums">${rankNo}</text>`;
-    s += `<text x="${label - 10}" y="${y + cell / 2 + 4}" text-anchor="end" font-size="13" fill="${mine ? ACCENT : INK}" font-weight="${mine ? 600 : 400}"><title>${esc(about)}</title>${esc(short(r.names[i]))}</text>`;
-    s += `<text x="${label + ri * cell + cell / 2}" y="${top - 8}" text-anchor="middle" font-size="12" fill="${mine ? ACCENT : MUTED}" font-weight="${mine ? 600 : 400}" style="font-variant-numeric:tabular-nums"><title>${esc(about)}</title>${rankNo}</text>`;
+    s += `<text data-tip="${about}" x="${label - 10}" y="${y + cell / 2 + 4}" text-anchor="end" font-size="13" fill="${mine ? ACCENT : INK}" font-weight="${mine ? 600 : 400}">${esc(short(r.names[i]))}</text>`;
+    s += `<text data-tip="${about}" x="${label + ri * cell + cell / 2}" y="${top - 8}" text-anchor="middle" font-size="12" fill="${mine ? ACCENT : MUTED}" font-weight="${mine ? 600 : 400}" style="font-variant-numeric:tabular-nums">${rankNo}</text>`;
     order.forEach((j, ci) => {
       const v = r.payoff[i][j], on = tapeSel && tapeSel.i === i && tapeSel.j === j;
-      const pair = i === j ? `${r.names[i]} against itself: ${f2(v)} a turn` : `${r.names[i]} against ${r.names[j]}: ${f2(v)} a turn for ${r.names[i]}, ${f2(r.payoff[j][i])} for ${r.names[j]}`;
-      s += `<rect class="cell${on ? " on" : ""}" data-i="${i}" data-j="${j}" x="${label + ci * cell + 1}" y="${y + 1}" width="${cell - 2}" height="${cell - 2}" rx="2" fill="${fill(v, mine || r.mine[j])}"><title>${esc(pair)}. Click to see the tape.</title></rect>`;
+      const pair = i === j ? tipText(`${r.names[i]} against itself`, `${f2(v)} a turn each.`) : tipText(`${r.names[i]} against ${r.names[j]}`, `${f2(v)} a turn for ${r.names[i]}, ${f2(r.payoff[j][i])} for ${r.names[j]}. Tap to see the tape.`);
+      s += `<rect class="cell${on ? " on" : ""}" data-tip="${pair}" data-i="${i}" data-j="${j}" x="${label + ci * cell + 1}" y="${y + 1}" width="${cell - 2}" height="${cell - 2}" rx="2" fill="${fill(v, mine || r.mine[j])}"/>`;
       s += `<text pointer-events="none" x="${label + ci * cell + cell / 2}" y="${y + cell / 2 + 4}" text-anchor="middle" font-size="12" fill="${INK}" style="font-variant-numeric:tabular-nums">${f2(v)}</text>`;
     });
-    s += `<g><title>${esc(summary)}</title><rect x="${barX}" y="${y}" width="${w - barX}" height="${cell}" fill="transparent"/>`;
+    s += `<g data-tip="${summary}"><rect x="${barX}" y="${y}" width="${w - barX}" height="${cell}" fill="transparent"/>`;
     s += `<rect x="${barX}" y="${y + cell / 2 - 1}" width="${barW}" height="2" fill="#f0f1f2"/>`;
     s += `<rect x="${barX}" y="${y + cell / 2 - 1}" width="${(barW * r.scores[i]) / 5}" height="2" fill="${mine ? ACCENT : "#9aa0a3"}"/>`;
     s += `<text x="${w}" y="${y + cell / 2 + 4}" text-anchor="end" font-size="13" fill="${INK}" style="font-variant-numeric:tabular-nums">${f2(r.scores[i])}</text></g>`;
@@ -409,6 +409,46 @@ $("matrix").addEventListener("click", (e) => {
   tapeSel = { i: +c.dataset.i, j: +c.dataset.j, rep: 0 };
   drawMatrix(); drawTapeCard();
 });
+
+// Details for the matrix: a tooltip on hover with a mouse, on a hold with a
+// finger. The text is stored on the element as a title line and a body.
+function tipText(title, body) { return esc(`${title}\u0000${body}`); }
+const tip = $("tip");
+let holdTimer = null, holdStart = null;
+function showTip(el, x, y, touch) {
+  const [title, body] = el.dataset.tip.split("\u0000");
+  tip.innerHTML = `<b>${esc(title)}</b><div class="doc">${esc(body)}</div>`;
+  tip.hidden = false;
+  const { width, height } = tip.getBoundingClientRect(), vw = innerWidth, vh = innerHeight;
+  let left = touch ? x - width / 2 : x + 14, top = touch ? y - height - 28 : y + 14;
+  if (left + width > vw - 8) left = vw - width - 8;
+  if (left < 8) left = 8;
+  if (top + height > vh - 8) top = y - height - 14;
+  if (top < 8) top = touch ? y + 28 : 8;
+  tip.style.left = `${left}px`; tip.style.top = `${top}px`;
+}
+function hideTip() { tip.hidden = true; clearTimeout(holdTimer); holdTimer = null; }
+const matrix = $("matrix");
+matrix.addEventListener("pointerover", (e) => {
+  if (e.pointerType !== "mouse") return;
+  const el = e.target.closest("[data-tip]");
+  el ? showTip(el, e.clientX, e.clientY, false) : hideTip();
+});
+matrix.addEventListener("pointermove", (e) => {
+  if (e.pointerType === "mouse") { if (!tip.hidden) { const el = e.target.closest("[data-tip]"); el && showTip(el, e.clientX, e.clientY, false); } return; }
+  if (holdStart && Math.hypot(e.clientX - holdStart.x, e.clientY - holdStart.y) > 8) hideTip();
+});
+matrix.addEventListener("pointerleave", hideTip);
+matrix.addEventListener("pointerdown", (e) => {
+  if (e.pointerType === "mouse") return;
+  const el = e.target.closest("[data-tip]");
+  if (!el) return;
+  holdStart = { x: e.clientX, y: e.clientY };
+  clearTimeout(holdTimer);
+  holdTimer = setTimeout(() => showTip(el, e.clientX, e.clientY, true), 400);
+});
+for (const type of ["pointerup", "pointercancel"]) matrix.addEventListener(type, (e) => { if (e.pointerType !== "mouse") hideTip(); });
+matrix.addEventListener("contextmenu", (e) => e.preventDefault());
 
 function drawTapeCard() {
   const r = result;

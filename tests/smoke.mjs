@@ -76,6 +76,23 @@ try {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.click("#matrix rect.cell[data-i='1'][data-j='2']");
   check((await page.textContent("#tape-title")) !== "", "clicking a cell selects a pairing");
+  await page.hover("#matrix rect.cell[data-i='0'][data-j='1']");
+  check(!(await page.$eval("#tip", (e) => e.hidden)) && (await page.textContent("#tip")).includes("against"), "hovering a cell shows the tooltip");
+  await page.hover("#matrix text[data-tip]");
+  check((await page.textContent("#tip")).includes("Names:"), "hovering a name shows the whole docstring");
+  await page.mouse.move(0, 0);
+  check(await page.$eval("#tip", (e) => e.hidden), "leaving the matrix hides the tooltip");
+  // a finger hold shows the same tooltip
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: true });
+  const box = await page.$eval("#matrix rect.cell[data-i='0'][data-j='1']", (e) => { const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: box.x, y: box.y }] });
+  await page.waitForTimeout(600);
+  check(!(await page.$eval("#tip", (e) => e.hidden)), "holding a cell shows the tooltip");
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await page.waitForTimeout(100);
+  check(await page.$eval("#tip", (e) => e.hidden), "lifting the finger hides it");
+  await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: false });
 
   // strategies survive a reload
   await page.click("#new-strategy");

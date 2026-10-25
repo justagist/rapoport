@@ -114,7 +114,11 @@ h1 { font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: -0.01
 .empty { color: var(--muted); border: 1px dashed var(--control); border-radius: 6px; padding: 9px 12px; margin-top: 16px; }
 
 /* results: a ranked matrix with a mean column */
-.matrix { margin-top: 16px; overflow-x: auto; }
+.matrix { margin-top: 16px; overflow-x: auto; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: pan-x pan-y; }
+/* the one floating thing on the screen, so it carries the one shadow */
+.tip { position: fixed; z-index: 30; max-width: 360px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14); font-size: 13px; line-height: 18px; white-space: pre-line; pointer-events: none; }
+.tip b { font-weight: 500; }
+.tip .doc { color: var(--muted); margin-top: 4px; max-height: 40vh; overflow: hidden; }
 .matrix svg { font-family: inherit; }
 .matrix rect.cell { cursor: pointer; }
 .matrix rect.cell:hover { stroke: var(--text); stroke-width: 1; }
