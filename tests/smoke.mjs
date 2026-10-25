@@ -119,12 +119,29 @@ try {
   check((await page.$$eval("#mine li", (l) => l.length)) === names, "user strategies persist across reload");
 
   // the guide is reachable from the roster and links back
-  await page.click('.nav a[href="guide.html"]');
+  // the docs open over the arena, so the runtime is not restarted
+  await page.waitForFunction(() => !document.getElementById("run").disabled, null, { timeout: 240000 });
+  await page.click('.nav a[data-doc="guide"]');
+  await page.waitForSelector("#doc[open] #arena");
+  check((await page.textContent("#doc-body h1")) === "Guide", "the guide opens in a dialog over the arena");
+  await page.click('#doc-body a[href="background.html"]');
+  await page.waitForSelector("#doc[open] #src-11");
+  check((await page.textContent("#doc-body h1")) === "Background", "the background opens in the same dialog from the guide's link");
+  check((await page.evaluate(() => location.hash)) === "#background", "the open doc is in the URL hash");
+  await page.goBack();
+  await page.waitForFunction(() => document.getElementById("doc-body").querySelector("#arena") !== null);
+  check(await page.$eval("#doc", (d) => d.open), "the back button returns to the guide");
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => !document.getElementById("doc").open && location.hash === "");
+  check(!(await page.$eval("#run", (b) => b.disabled)) && (await page.textContent("#status")).includes("matches"), "Escape closes the dialog, clears the hash, and the arena keeps its runtime");
+
+  // the standalone pages still work
+  await page.goto(`http://localhost:${port}/guide.html`);
   await page.waitForSelector("h1");
-  check((await page.textContent("h1")) === "Guide" && (await page.$('a.btn[href="./"]')) !== null, "guide page opens from the roster and links back to the arena");
+  check((await page.textContent("h1")) === "Guide" && (await page.$('a.btn[href="./"]')) !== null, "guide page stands on its own and links back to the arena");
   await page.click('a.btn[href="background.html"]');
   await page.waitForSelector("h1");
-  check((await page.textContent("h1")) === "Background" && (await page.$("#src-11")) !== null, "background page opens from the guide and carries the sources");
+  check((await page.textContent("h1")) === "Background" && (await page.$("#src-11")) !== null, "background page stands on its own and carries the sources");
   await page.goto(`http://localhost:${port}/`);
 
   // offline: the shell and the runtime come from the service worker cache

@@ -47,7 +47,7 @@
           <div><h2>Payoff per turn, row against column</h2><p class="note" id="results-note">Mutual cooperation pays 3, mutual defection 1, a sucker 0 and a cheat 5. Rows are ranked by their mean. Hover or hold a name, a cell or a mean for details.</p></div>
         </header>
         <div class="matrix" id="matrix"></div>
-        <p class="empty" id="results-empty">No run yet. Tick a few strategies in the roster and run a tournament, or <a href="guide.html#arena">read how</a> first.</p>
+        <p class="empty" id="results-empty">No run yet. Tick a few strategies in the roster and run a tournament, or <a href="guide.html#arena" data-doc="guide" data-anchor="#arena">read how</a> first.</p>
       </section>
 
       <section class="card wide" id="tape-card">
@@ -89,7 +89,7 @@
 
   <aside class="roster" id="roster">
     <div class="mark"><svg viewBox="0 0 22 22" aria-hidden="true"><rect x="1" y="1" width="9" height="9" fill="#1b6c80"/><rect x="12.75" y="1.75" width="7.5" height="7.5" fill="none" stroke="#131416" stroke-width="1.5"/><rect x="1.75" y="12.75" width="7.5" height="7.5" fill="none" stroke="#131416" stroke-width="1.5"/><rect x="12" y="12" width="9" height="9" fill="#1b6c80"/></svg>Rapoport<button class="close" id="close-roster">Close</button></div>
-    <nav class="nav"><a aria-current="page" href="./">Arena</a><a href="guide.html">Guide</a><a href="background.html">Background</a></nav>
+    <nav class="nav"><a aria-current="page" href="./">Arena</a><a href="guide.html" data-doc="guide">Guide</a><a href="background.html" data-doc="background">Background</a></nav>
 
     <div class="settings">
       <label>Turns <input type="number" min="1" max="10000" value="200" data-setting="turns"></label>
@@ -107,11 +107,16 @@
     <a class="skip" href="#results">Skip the library list</a>
     <ul class="list library" id="lib"><li class="pending">Library still loading</li></ul>
 
-    <p class="foot">Python runs in this tab. Nothing leaves your computer. <span class="foot-links"><a href="guide.html">Guide</a> · <a href="background.html">Background</a></span></p>
+    <p class="foot">Python runs in this tab. Nothing leaves your computer. <span class="foot-links"><a href="guide.html" data-doc="guide">Guide</a> · <a href="background.html" data-doc="background">Background</a></span></p>
   </aside>
 </div>
 <input type="file" id="import-file" accept=".py,text/x-python" hidden>
 <div class="tip" id="tip" role="tooltip" hidden></div>
+<!-- the guide and background open here, over the arena, so the Python runtime keeps running -->
+<dialog class="doc-dialog" id="doc" aria-labelledby="doc-title">
+  <div class="doc-bar"><span class="doc-bar-title" id="doc-title">Guide</span><span class="spacer"></span><a class="btn text" id="doc-page" href="guide.html">Open as its own page</a><button class="btn" id="doc-close">Close</button></div>
+  <div class="doc-body" id="doc-body"></div>
+</dialog>
 <script type="module" src="app.js"></script>
 </body>
 </html>

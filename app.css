@@ -235,6 +235,20 @@ h1 { font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: -0.01
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0.01ms !important; } }
 
+/* ---------- the docs as an overlay over the arena ---------- */
+.doc-dialog { width: min(1120px, calc(100vw - 32px)); max-width: none; height: calc(100svh - 32px); max-height: none; margin: 16px auto; padding: 0; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); color: var(--text); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18); overflow: auto; overscroll-behavior: contain; }
+.doc-dialog::backdrop { background: rgba(19, 20, 22, 0.35); }
+.doc-bar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 16px 0 24px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.doc-bar-title { font-weight: 600; font-size: 15px; }
+.doc-body { padding: 24px; }
+.doc-dialog .side { top: 72px; }
+@media (max-width: 1024px) {
+  .doc-dialog { width: 100vw; height: 100svh; margin: 0; border: 0; border-radius: 0; }
+  .doc-bar { padding: 0 8px 0 16px; }
+  .doc-body { padding: 16px; }
+  .doc-bar .text { display: none; }
+}
+
 /* ---------- guide ---------- */
 .doc .app { grid-template-columns: minmax(0, 1fr); }
 .doc .topbar { padding: 0 24px 0 12px; gap: 8px; }
