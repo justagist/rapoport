@@ -1,12 +1,6 @@
 // Rapoport: the arena page. Talks to the engine worker, keeps the visitor's
 // strategies in localStorage and draws the matrix and the tapes.
 
-// esm.sh resolves the shared @codemirror packages to one build each, so the
-// editor, the Python mode and the state module share one instance.
-import { EditorView, basicSetup } from "https://esm.sh/codemirror@6.0.1";
-import { python } from "https://esm.sh/@codemirror/lang-python@6.1.7";
-import { EditorState, Compartment } from "https://esm.sh/@codemirror/state@6";
-
 const TEMPLATE = `import axelrod as axl
 from axelrod.action import Action
 
@@ -37,13 +31,19 @@ class Probe(axl.Player):
 
 const $ = (id) => document.getElementById(id);
 const ACCENT = "#1b6c80", INK = "#131416", MUTED = "#5d5f60";
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 
-// ---------- worker ----------
-// The service worker must control the page before the runtime download
-// starts, or the first files fetched are never cached for the next visit.
+// ---------- service worker, then the engine ----------
+// The service worker should control the page before the runtime download
+// starts, so the first files are cached for the next visit. It must not hold
+// the page up if it fails to install, so wait for it three seconds at most.
 if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
-  try { await navigator.serviceWorker.register("sw.js"); await navigator.serviceWorker.ready; } catch { /* the page works without it */ }
+  await Promise.race([
+    navigator.serviceWorker.register("sw.js").then(() => navigator.serviceWorker.ready).catch(() => {}),
+    new Promise((resolve) => setTimeout(resolve, 3000)),
+  ]);
 }
+
 const worker = new Worker("worker.js");
 let seq = 0;
 const pending = new Map();
@@ -61,6 +61,11 @@ function call(cmd, args, onProgress) {
     worker.postMessage({ id, cmd, args });
   });
 }
+const booting = call("init", {}, ([done, total], label) => { status(`${label} (${done + 1} of ${total})`); progress(done, total); });
+
+// The editor is one vendored bundle (see tools/editor-entry.js) and loads in
+// the background while the runtime downloads.
+const editorLoading = import("./vendor/editor.js");
 
 // ---------- state ----------
 const store = {
@@ -78,6 +83,7 @@ let selected = new Set(store.selected || ["TitForTat", "Defector", "Cooperator",
 let library = [];
 let current = strategies[0].id;   // editor tab: a strategy id or "source"
 let ready = false;
+let running = false;
 let result = null;                // last tournament
 let tapeSel = null;               // {i, j, rep} into result, or {names, moves, scores, mine} for one match
 
@@ -89,7 +95,25 @@ const settings = () => {
 for (const input of document.querySelectorAll("[data-setting]")) {
   input.addEventListener("input", () => {
     for (const other of document.querySelectorAll(`[data-setting="${input.dataset.setting}"]`)) if (other !== input) other.value = input.value;
+    drawEstimate();
   });
+}
+function field() {
+  return [...strategies.filter((s) => selected.has(s.id)).map((s) => ({ kind: "user", id: s.id })),
+          ...library.filter((s) => selected.has(s.id)).map((s) => ({ kind: "lib", id: s.id }))];
+}
+
+// ---------- status ----------
+function status(text) { $("status").textContent = text; }
+function progress(done, total) {
+  const el = $("progress");
+  el.hidden = done === null;
+  if (done !== null) el.firstElementChild.style.width = `${(100 * done) / total}%`;
+}
+function drawEstimate() {
+  if (!ready || running) return;
+  const n = field().length, { repetitions } = settings();
+  status(n < 2 ? "Pick at least two strategies." : `${((n * (n + 1)) / 2) * repetitions} matches to play.`);
 }
 
 // ---------- roster ----------
@@ -113,29 +137,39 @@ document.querySelector(".roster").addEventListener("change", (e) => {
   if (!id) return;
   e.target.checked ? selected.add(id) : selected.delete(id);
   store.selected = [...selected];
-  drawClear();
+  drawClear(); drawEstimate();
 });
 $("clear").addEventListener("click", () => {
   selected.clear(); store.selected = [];
   for (const c of document.querySelectorAll(".roster input:checked")) c.checked = false;
-  drawClear();
+  drawClear(); drawEstimate();
 });
 $("new-strategy").addEventListener("click", () => {
   const s = { id: "u" + Date.now().toString(36), name: "Untitled", code: TEMPLATE.replace(/Probe/g, "MyStrategy") };
   strategies.push(s); store.strategies = strategies;
   selected.add(s.id); store.selected = [...selected];
-  drawMine(); openTab(s.id); closeRoster();
+  drawMine(); drawOpponents(); openTab(s.id); closeRoster(); drawEstimate();
 });
 $("menu").addEventListener("click", () => { const open = !$("roster").classList.contains("open"); $("roster").classList.toggle("open", open); $("menu").setAttribute("aria-expanded", String(open)); });
 function closeRoster() { $("roster").classList.remove("open"); $("menu").setAttribute("aria-expanded", "false"); }
 $("close-roster").addEventListener("click", closeRoster);
 
 // ---------- editor ----------
-const readOnly = new Compartment();
-const view = new EditorView({
-  parent: $("cm"),
-  state: EditorState.create({ doc: "", extensions: [basicSetup, python(), readOnly.of([]), EditorView.updateListener.of((u) => { if (u.docChanged && current !== "source") saveCode(); })] }),
-});
+let view = null, EditorState = null, EditorView = null, readOnly = null;
+async function mountEditor() {
+  try {
+    const cm = await editorLoading;
+    EditorView = cm.EditorView; EditorState = cm.EditorState; readOnly = new cm.Compartment();
+    view = new EditorView({
+      parent: $("cm"),
+      state: EditorState.create({ doc: "", extensions: [cm.basicSetup, cm.python(), readOnly.of([]), EditorView.updateListener.of((u) => { if (u.docChanged && current !== "source") saveCode(); })] }),
+    });
+    return true;
+  } catch {
+    $("cm").innerHTML = `<p class="editor-fail">The code editor did not load. Reload to try again. Saved strategies still run.</p>`;
+    return false;
+  }
+}
 let saveTimer;
 function saveCode() {
   clearTimeout(saveTimer);
@@ -145,6 +179,7 @@ function saveCode() {
   }, 300);
 }
 function setDoc(text, ro) {
+  if (!view) return;
   view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text }, effects: readOnly.reconfigure(ro ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : []) });
   $("cm").classList.toggle("readonly", ro);
 }
@@ -154,7 +189,7 @@ function drawTabs() {
     + `<div class="right"><button id="export" title="Download this strategy as a .py file">Export</button><button id="import">Import</button><button id="delete">Delete</button></div>`;
   const own = current !== "source";
   $("export").hidden = !own; $("delete").hidden = !own || strategies.length === 1;
-  $("check-btn").disabled = !ready || !own; $("play-btn").disabled = !ready || !own;
+  $("check-btn").disabled = !ready || !own || !view; $("play-btn").disabled = !ready || !own || !view;
   $("source-pick").hidden = own;
 }
 $("tabs").addEventListener("click", (e) => {
@@ -173,6 +208,7 @@ function openTab(id) {
   showCheck(null);
 }
 async function showSource() {
+  if (!ready) { setDoc("# The library is still loading. Try again in a moment.", true); return; }
   const key = $("source-select").value || library[0]?.id;
   setDoc(key ? await call("source", { key }) : "", true);
 }
@@ -189,6 +225,7 @@ C, D = Action.C, Action.D
 
 `;
 $("copy-source").addEventListener("click", () => {
+  if (!ready || !view) return;
   const lib = library.find((x) => x.id === $("source-select").value);
   let code = view.state.doc.toString();
   const named = code.match(/name = (["'])(.*?)\1/);
@@ -196,7 +233,7 @@ $("copy-source").addEventListener("click", () => {
   const s = { id: "u" + Date.now().toString(36), name: `${lib.name}_copy`, code: COPY_HEADER + code };
   strategies.push(s); store.strategies = strategies;
   selected.add(s.id); store.selected = [...selected];
-  drawMine(); drawOpponents(); openTab(s.id);
+  drawMine(); drawOpponents(); openTab(s.id); drawEstimate();
 });
 function exportCurrent() {
   const s = strategies.find((x) => x.id === current);
@@ -212,7 +249,7 @@ $("import-file").addEventListener("change", async (e) => {
   const s = { id: "u" + Date.now().toString(36), name: file.name.replace(/\.py$/, ""), code: await file.text() };
   strategies.push(s); store.strategies = strategies;
   selected.add(s.id); store.selected = [...selected];
-  drawMine(); openTab(s.id);
+  drawMine(); drawOpponents(); openTab(s.id); drawEstimate();
   e.target.value = "";
 });
 function deleteCurrent() {
@@ -220,13 +257,13 @@ function deleteCurrent() {
   if (!confirm(`Delete ${s.name}? This cannot be undone.`)) return;
   strategies = strategies.filter((x) => x !== s); store.strategies = strategies;
   selected.delete(s.id); store.selected = [...selected];
-  drawMine(); openTab(strategies[0].id);
+  drawMine(); drawOpponents(); openTab(strategies[0].id); drawEstimate();
 }
 
 // ---------- check ----------
 async function define(s) {
   const info = await call("define", { uid: s.id, code: s.code });
-  if (info.name !== s.name) { s.name = info.name; store.strategies = strategies; drawMine(); drawTabs(); }
+  if (info.name !== s.name) { s.name = info.name; store.strategies = strategies; drawMine(); drawTabs(); drawOpponents(); }
   return info;
 }
 function showCheck(info, error) {
@@ -253,7 +290,7 @@ $("play-btn").addEventListener("click", async () => {
   try {
     const info = await define(s);
     const opp = $("opponent").value;
-    const oppSpec = opp.startsWith("u") && strategies.some((x) => x.id === opp) ? { kind: "user", id: opp } : { kind: "lib", id: opp };
+    const oppSpec = strategies.some((x) => x.id === opp) ? { kind: "user", id: opp } : { kind: "lib", id: opp };
     if (oppSpec.kind === "user") await define(strategies.find((x) => x.id === opp));
     const m = await call("match", { a: { kind: "user", id: s.id }, b: oppSpec, turns, noise, seed });
     showCheck(info);
@@ -266,19 +303,20 @@ function nameOf(spec) {
   return spec.kind === "user" ? strategies.find((x) => x.id === spec.id).name : library.find((x) => x.id === spec.id).name;
 }
 function drawOpponents() {
-  const sel = $("opponent");
+  if (!ready) return;
+  const sel = $("opponent"), was = sel.value;
   sel.innerHTML = strategies.map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join("") + library.map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join("");
-  sel.value = "TitForTat";
+  sel.value = [...sel.options].some((o) => o.value === was) ? was : "TitForTat";
+  sel.disabled = false;
 }
 
 // ---------- tournament ----------
 $("run").addEventListener("click", runTournament);
 async function runTournament() {
-  const specs = [...strategies.filter((s) => selected.has(s.id)).map((s) => ({ kind: "user", id: s.id })),
-                 ...library.filter((s) => selected.has(s.id)).map((s) => ({ kind: "lib", id: s.id }))];
+  const specs = field();
   if (specs.length < 2) { status("Pick at least two strategies."); return; }
   const opts = settings();
-  $("run").disabled = true;
+  running = true; $("run").disabled = true;
   const t0 = performance.now();
   try {
     for (const spec of specs.filter((s) => s.kind === "user")) {
@@ -291,19 +329,12 @@ async function runTournament() {
     const firstMine = result.mine.indexOf(true), leader = result.ranking[0];
     tapeSel = firstMine >= 0 && firstMine !== leader ? { i: firstMine, j: leader, rep: 0 } : { i: leader, j: result.ranking[1], rep: 0 };
     drawResults();
-    status("");
   } catch (e) {
     status("The tournament failed.");
     $("results-empty").hidden = false; $("results-empty").textContent = e.message;
   } finally {
-    progress(null); $("run").disabled = false;
+    progress(null); running = false; $("run").disabled = false; drawEstimate();
   }
-}
-function status(text) { $("status").textContent = text; }
-function progress(done, total) {
-  const el = $("progress");
-  el.hidden = done === null;
-  if (done !== null) el.firstElementChild.style.width = `${(100 * done) / total}%`;
 }
 
 // ---------- results ----------
@@ -312,23 +343,24 @@ const f2 = (v) => v.toFixed(2);
 
 function drawResults() {
   const r = result, n = r.names.length, rank = r.ranking;
-  const by = (i) => r.names[i];
+  const by = (i) => esc(r.names[i]);
   const leader = rank[0];
-  let finding = `<b>${esc(by(leader))} leads at ${f2(r.scores[leader])} a turn.</b>`;
   const mine = r.mine.indexOf(true);
+  let finding;
+  if (mine === leader) finding = `<b>Your strategy ${by(leader)} leads at ${f2(r.scores[leader])} a turn.</b>`;
+  else finding = `<b>${by(leader)} leads at ${f2(r.scores[leader])} a turn.</b>`;
   if (mine >= 0) {
-    const pos = rank.indexOf(mine) + 1;
     const row = r.payoff[mine].map((v, j) => ({ v, j })).filter((x) => x.j !== mine);
     const worst = row.reduce((a, b) => (b.v < a.v ? b : a)), best = row.reduce((a, b) => (b.v > a.v ? b : a));
-    finding += mine === leader ? ` It is your strategy.` : ` ${esc(by(mine))} is ${ordinal(pos)} at ${f2(r.scores[mine])}.`;
-    finding += ` It does best against ${esc(by(best.j))} (${f2(best.v)}) and worst against ${esc(by(worst.j))} (${f2(worst.v)}).`;
+    if (mine !== leader) finding += ` ${by(mine)} is ${ordinal(rank.indexOf(mine) + 1)} at ${f2(r.scores[mine])}.`;
+    finding += ` It does best against ${by(best.j)} (${f2(best.v)}) and worst against ${by(worst.j)} (${f2(worst.v)}).`;
   } else {
     const last = rank[n - 1];
-    finding += ` ${esc(by(last))} is last at ${f2(r.scores[last])}.`;
+    finding += ` ${by(last)} is last at ${f2(r.scores[last])}.`;
   }
   $("finding").innerHTML = finding;
   $("stamp").textContent = `${n} strategies · ${r.turns} turns · ${r.repetitions} repetition${r.repetitions === 1 ? "" : "s"}${r.noise ? ` · noise ${r.noise}` : ""} · seed ${r.seed} · ${r.seconds.toFixed(1)} s`;
-  $("results-note").innerHTML = `Mean over ${r.repetitions} repetition${r.repetitions === 1 ? "" : "s"} of ${r.turns} turns. Mutual cooperation pays 3, mutual defection 1, a sucker 0 and a cheat 5. Rows are ranked by their mean.`;
+  $("results-note").innerHTML = `Mean over ${r.repetitions} repetition${r.repetitions === 1 ? "" : "s"} of ${r.turns} turns. Mutual cooperation pays 3, mutual defection 1, a sucker 0 and a cheat 5. Rows are ranked by their mean; a column's number is the rank of that strategy.`;
   $("results-empty").hidden = true;
   drawMatrix();
   drawTapeCard();
@@ -338,7 +370,7 @@ function drawMatrix() {
   const r = result, order = r.ranking, n = order.length;
   const host = $("matrix");
   const width = host.clientWidth || 1100;
-  const narrow = width < 520, label = narrow ? 112 : 150, scoreW = 52, gap = 24, minBar = 120;
+  const narrow = width < 520, label = narrow ? 124 : 160, scoreW = 52, gap = 24, minBar = 120;
   const cell = Math.max(28, Math.min(44, Math.floor((width - label - gap - minBar - scoreW) / n)));
   // the mean bar takes whatever width the cells leave, so the figure ends on the card's edge
   const w = Math.max(width, label + n * cell + gap + minBar + scoreW);
@@ -347,14 +379,15 @@ function drawMatrix() {
   // light ramps so ink figures hold their contrast on every cell
   const fill = (v, mine) => mine ? `rgba(27,108,128,${0.08 + (v / 5) * 0.45})` : `rgba(19,20,22,${0.04 + (v / 5) * 0.3})`;
   const max = narrow ? 13 : 18, short = (name) => (name.length > max ? name.slice(0, max - 1) + "…" : name);
-  const initials = (name) => name.split(/[\s-]+/).map((p) => p[0]).join("").slice(0, 3);
   let s = `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="Payoff per turn of each strategy against each other, ranked">`;
   order.forEach((i, ri) => {
-    const mine = r.mine[i], col = mine ? ACCENT : MUTED, y = top + ri * cell;
+    const mine = r.mine[i], y = top + ri * cell, rankNo = ri + 1;
     const about = `${r.names[i]}: ${r.mine[i] ? "your strategy" : r.docs[i] || "from the Axelrod library"}`;
-    const summary = `${r.names[i]} is ${ordinal(ri + 1)} of ${n}: ${f2(r.scores[i])} a turn on average, won ${r.wins[i].toFixed(1)} of ${n - 1} matches a repetition, cooperated ${Math.round(100 * r.cooperation[i])}% of the time`;
+    const summary = `${r.names[i]} is ${ordinal(rankNo)} of ${n}: ${f2(r.scores[i])} a turn on average, won ${r.wins[i].toFixed(1)} of ${n - 1} matches a repetition, cooperated ${Math.round(100 * r.cooperation[i])}% of the time`;
+    // rows and columns share the rank order, so the rank number heads the column
+    s += `<text x="4" y="${y + cell / 2 + 4}" font-size="12" fill="${MUTED}" style="font-variant-numeric:tabular-nums">${rankNo}</text>`;
     s += `<text x="${label - 10}" y="${y + cell / 2 + 4}" text-anchor="end" font-size="13" fill="${mine ? ACCENT : INK}" font-weight="${mine ? 600 : 400}"><title>${esc(about)}</title>${esc(short(r.names[i]))}</text>`;
-    s += `<text x="${label + ri * cell + cell / 2}" y="${top - 8}" text-anchor="middle" font-size="12" fill="${col}" font-weight="${mine ? 600 : 400}"><title>${esc(about)}</title>${esc(initials(r.names[i]))}</text>`;
+    s += `<text x="${label + ri * cell + cell / 2}" y="${top - 8}" text-anchor="middle" font-size="12" fill="${mine ? ACCENT : MUTED}" font-weight="${mine ? 600 : 400}" style="font-variant-numeric:tabular-nums"><title>${esc(about)}</title>${rankNo}</text>`;
     order.forEach((j, ci) => {
       const v = r.payoff[i][j], on = tapeSel && tapeSel.i === i && tapeSel.j === j;
       const pair = i === j ? `${r.names[i]} against itself: ${f2(v)} a turn` : `${r.names[i]} against ${r.names[j]}: ${f2(v)} a turn for ${r.names[i]}, ${f2(r.payoff[j][i])} for ${r.names[j]}`;
@@ -394,11 +427,11 @@ function drawTapeCard() {
   $("tape-empty").hidden = true;
   $("tape-title").textContent = `${names[0]} against ${names[1]}`;
   const [a, b] = scores;
-  const verdict = a === b ? "a draw" : a > b ? `${names[0]} ahead by ${a - b}` : `${names[1]} ahead by ${b - a}`;
-  $("tape-note").innerHTML = `${turns} turns · <b>${a} to ${b}</b>, ${verdict} · ${moves[0].split("").filter((c) => c === "C").length + moves[1].split("").filter((c) => c === "C").length} of ${2 * turns} moves cooperated. Filled is cooperate, hollow is defect.`;
-  const reps_el = $("reps");
-  reps_el.hidden = reps < 2;
-  if (reps >= 2) reps_el.innerHTML = Array.from({ length: reps }, (_, k) => `<button aria-pressed="${k === tapeSel.rep}" data-rep="${k}" aria-label="Repetition ${k + 1}">${k + 1}</button>`).join("");
+  const verdict = a === b ? "a draw" : a > b ? `${esc(names[0])} ahead by ${a - b}` : `${esc(names[1])} ahead by ${b - a}`;
+  const coops = (moves[0] + moves[1]).split("").filter((c) => c === "C").length;
+  $("tape-note").innerHTML = `${turns} turns · <b>${a} to ${b}</b>, ${verdict} · ${coops} of ${2 * turns} moves cooperated. Filled is cooperate, hollow is defect.`;
+  $("reps-wrap").hidden = reps < 2;
+  if (reps >= 2) $("reps").innerHTML = Array.from({ length: reps }, (_, k) => `<button aria-pressed="${k === tapeSel.rep}" data-rep="${k}" aria-label="Repetition ${k + 1}">${k + 1}</button>`).join("");
   drawTape($("tape"), names, moves, scores, mine, { labels: true });
 }
 $("reps").addEventListener("click", (e) => {
@@ -408,11 +441,16 @@ $("reps").addEventListener("click", (e) => {
   drawTapeCard();
 });
 
-// Two rows of squares, one a turn. Filled teal is cooperate, hollow is defect.
+// Two strips of squares, one a turn. Filled teal is cooperate, hollow is
+// defect. The names and scores stay put; only the strips scroll when a long
+// match does not fit.
 function drawTape(host, names, moves, scores, mine, { labels }) {
+  host.innerHTML = labels
+    ? `<div class="tape-grid"><div class="whos">${[0, 1].map((k) => `<span class="who${mine[k] ? " mine" : ""}" title="${esc(names[k])}">${esc(names[k])}</span>`).join("")}</div><div class="strips"></div><div class="scores num">${[0, 1].map((k) => `<span>${scores[k]}</span>`).join("")}</div></div>`
+    : `<div class="tape-grid bare"><div class="strips"></div></div>`;
+  const strips = host.querySelector(".strips");
   const n = moves[0].length;
-  const avail = host.clientWidth - (labels ? 152 + 60 : 0);
-  const sq = Math.max(4, Math.min(16, Math.floor(avail / n)));
+  const sq = Math.max(3, Math.min(16, Math.floor(strips.clientWidth / n)));
   const w = n * sq, g = sq >= 8 ? 2 : 1;
   const row = (str) => {
     let s = `<svg viewBox="0 0 ${w} 20" width="${w}" height="20" aria-hidden="true">`;
@@ -423,24 +461,24 @@ function drawTape(host, names, moves, scores, mine, { labels }) {
     }
     return s + `</svg>`;
   };
-  host.innerHTML = [0, 1].map((k) => `<div class="row">${labels ? `<span class="who${mine[k] ? " mine" : ""}" title="${esc(names[k])}">${esc(names[k])}</span>` : ""}${row(moves[k])}${labels ? `<span class="score num">${scores[k]}</span>` : ""}</div>`).join("")
-    + (labels ? `<div class="axis num" style="width:${w}px"><span>turn 1</span><span>turn ${n}</span></div>` : "");
+  strips.innerHTML = row(moves[0]) + row(moves[1]) + (labels ? `<div class="axis num" style="width:${w}px"><span>turn 1</span><span>turn ${n}</span></div>` : "");
 }
 
 // ---------- boot ----------
-function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
-
 drawMine(); drawTabs();
-setDoc(strategies.find((s) => s.id === current).code, false);
+const editorOk = await mountEditor();
+if (editorOk) openTab(current);
 try {
-  await call("init", {}, ([done, total], label) => { status(`${label} (${done + 1} of ${total})`); progress(done, total); });
+  await booting;
   library = await call("library");
   $("lib-count").textContent = library.length;
+  ready = true;
+  document.body.classList.remove("loading");
   drawLibrary(); drawOpponents();
   $("source-select").innerHTML = library.map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join("");
   $("source-select").value = "TitForTat";
-  ready = true;
-  progress(null); status(""); $("run").disabled = false; drawTabs();
+  if (current === "source") showSource();
+  progress(null); $("run").disabled = false; drawTabs(); drawEstimate();
 } catch (e) {
   status("The Python runtime did not load. Reload to try again.");
   $("results-empty").textContent = e.message;

@@ -3,9 +3,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "smoke": "node tests/smoke.mjs"
+    "smoke": "node tests/smoke.mjs",
+    "build:editor": "esbuild tools/editor-entry.js --bundle --format=esm --minify --outfile=vendor/editor.js"
   },
   "devDependencies": {
+    "@codemirror/lang-python": "^6.1.7",
+    "@codemirror/state": "^6.7.6",
+    "codemirror": "^6.0.1",
+    "esbuild": "^0.24.2",
     "playwright-core": "^1.52.0"
   }
 }

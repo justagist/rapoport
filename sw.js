@@ -1,11 +1,11 @@
 // Service worker: the shell is precached and refreshed from the network when
-// online; the Python runtime, the wheels, the editor and the fonts are cached
+// online; the Python runtime, the wheels and the fonts are cached
 // the first time they are fetched, so later visits work offline.
 
-const SHELL = "rapoport-shell-v2";
+const SHELL = "rapoport-shell-v3";
 const RUNTIME = "rapoport-runtime-v1";
-const SHELL_FILES = ["./", "index.html", "guide.html", "app.css", "app.js", "worker.js", "py/engine.py", "manifest.webmanifest", "icons/mark.svg", "icons/icon-192.png", "icons/icon-512.png"];
-const RUNTIME_HOSTS = ["cdn.jsdelivr.net", "esm.sh", "pypi.org", "files.pythonhosted.org", "fonts.googleapis.com", "fonts.gstatic.com"];
+const SHELL_FILES = ["./", "index.html", "guide.html", "app.css", "app.js", "vendor/editor.js", "worker.js", "py/engine.py", "manifest.webmanifest", "icons/mark.svg", "icons/icon-192.png", "icons/icon-512.png"];
+const RUNTIME_HOSTS = ["cdn.jsdelivr.net", "pypi.org", "files.pythonhosted.org", "fonts.googleapis.com", "fonts.gstatic.com"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(SHELL).then((c) => c.addAll(SHELL_FILES)).then(() => self.skipWaiting()));
