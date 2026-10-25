@@ -29,7 +29,7 @@
     <ul class="list" id="mine"></ul>
     <button class="new" id="new-strategy">New strategy</button>
 
-    <h2>Library <span class="count" id="lib-count"></span></h2>
+    <h2>Library <span class="count" id="lib-count"></span><button class="clear" id="clear" hidden>Clear selection</button></h2>
     <input class="search" id="search" type="search" placeholder="Find a strategy" aria-label="Find a library strategy">
     <ul class="list library" id="lib"></ul>
 
@@ -80,7 +80,7 @@
 
       <section class="card editor" id="editor-card">
         <div class="tabs" id="tabs" role="tablist"></div>
-        <div class="source-pick" id="source-pick" hidden><span>Library source of</span><select class="input" id="source-select" aria-label="Library strategy to read"></select></div>
+        <div class="source-pick" id="source-pick" hidden><span>Library source of</span><select class="input" id="source-select" aria-label="Library strategy to read"></select><button class="btn" id="copy-source">Copy into a new strategy</button></div>
         <div class="cm-host" id="cm"></div>
       </section>
 

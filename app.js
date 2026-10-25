@@ -93,7 +93,12 @@ for (const input of document.querySelectorAll("[data-setting]")) {
 }
 
 // ---------- roster ----------
+function drawClear() {
+  $("clear").hidden = selected.size === 0;
+  $("clear").textContent = `Clear ${selected.size} selected`;
+}
 function drawMine() {
+  drawClear();
   $("mine").innerHTML = strategies.map((s) => `<li class="mine"><label><input type="checkbox" data-id="${s.id}" ${selected.has(s.id) ? "checked" : ""}><span>${esc(s.name)}</span></label></li>`).join("");
 }
 function drawLibrary() {
@@ -108,6 +113,12 @@ document.querySelector(".roster").addEventListener("change", (e) => {
   if (!id) return;
   e.target.checked ? selected.add(id) : selected.delete(id);
   store.selected = [...selected];
+  drawClear();
+});
+$("clear").addEventListener("click", () => {
+  selected.clear(); store.selected = [];
+  for (const c of document.querySelectorAll(".roster input:checked")) c.checked = false;
+  drawClear();
 });
 $("new-strategy").addEventListener("click", () => {
   const s = { id: "u" + Date.now().toString(36), name: "Untitled", code: TEMPLATE.replace(/Probe/g, "MyStrategy") };
@@ -166,6 +177,27 @@ async function showSource() {
   setDoc(key ? await call("source", { key }) : "", true);
 }
 $("source-select").addEventListener("change", showSource);
+
+// A library strategy as the start of a new one: the class body with the
+// imports its module gave it, and "_copy" on the name until it is renamed.
+const COPY_HEADER = `import axelrod as axl
+from axelrod.action import Action
+from axelrod.player import Player
+
+C, D = Action.C, Action.D
+
+
+`;
+$("copy-source").addEventListener("click", () => {
+  const lib = library.find((x) => x.id === $("source-select").value);
+  let code = view.state.doc.toString();
+  const named = code.match(/name = (["'])(.*?)\1/);
+  if (named) code = code.replace(named[0], `name = ${named[1]}${named[2]}_copy${named[1]}`);
+  const s = { id: "u" + Date.now().toString(36), name: `${lib.name}_copy`, code: COPY_HEADER + code };
+  strategies.push(s); store.strategies = strategies;
+  selected.add(s.id); store.selected = [...selected];
+  drawMine(); drawOpponents(); openTab(s.id);
+});
 function exportCurrent() {
   const s = strategies.find((x) => x.id === current);
   const a = document.createElement("a");
@@ -255,7 +287,7 @@ async function runTournament() {
     }
     progress(0, 1); status("Playing the first match");
     const r = await call("tournament", { specs, ...opts }, ([done, total]) => { progress(done, total); status(`Match ${done} of ${total}`); });
-    result = { ...r, specs, names: specs.map(nameOf), mine: specs.map((s) => s.kind === "user"), ...opts, seconds: (performance.now() - t0) / 1000 };
+    result = { ...r, specs, names: specs.map(nameOf), mine: specs.map((s) => s.kind === "user"), docs: specs.map((s) => (s.kind === "lib" ? library.find((x) => x.id === s.id).doc : "")), ...opts, seconds: (performance.now() - t0) / 1000 };
     const firstMine = result.mine.indexOf(true), leader = result.ranking[0];
     tapeSel = firstMine >= 0 && firstMine !== leader ? { i: firstMine, j: leader, rep: 0 } : { i: leader, j: result.ranking[1], rep: 0 };
     drawResults();
@@ -319,16 +351,20 @@ function drawMatrix() {
   let s = `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="Payoff per turn of each strategy against each other, ranked">`;
   order.forEach((i, ri) => {
     const mine = r.mine[i], col = mine ? ACCENT : MUTED, y = top + ri * cell;
-    s += `<text x="${label - 10}" y="${y + cell / 2 + 4}" text-anchor="end" font-size="13" fill="${mine ? ACCENT : INK}" font-weight="${mine ? 600 : 400}">${esc(short(r.names[i]))}</text>`;
-    s += `<text x="${label + ri * cell + cell / 2}" y="${top - 8}" text-anchor="middle" font-size="12" fill="${col}" font-weight="${mine ? 600 : 400}">${esc(initials(r.names[i]))}</text>`;
+    const about = `${r.names[i]}: ${r.mine[i] ? "your strategy" : r.docs[i] || "from the Axelrod library"}`;
+    const summary = `${r.names[i]} is ${ordinal(ri + 1)} of ${n}: ${f2(r.scores[i])} a turn on average, won ${r.wins[i].toFixed(1)} of ${n - 1} matches a repetition, cooperated ${Math.round(100 * r.cooperation[i])}% of the time`;
+    s += `<text x="${label - 10}" y="${y + cell / 2 + 4}" text-anchor="end" font-size="13" fill="${mine ? ACCENT : INK}" font-weight="${mine ? 600 : 400}"><title>${esc(about)}</title>${esc(short(r.names[i]))}</text>`;
+    s += `<text x="${label + ri * cell + cell / 2}" y="${top - 8}" text-anchor="middle" font-size="12" fill="${col}" font-weight="${mine ? 600 : 400}"><title>${esc(about)}</title>${esc(initials(r.names[i]))}</text>`;
     order.forEach((j, ci) => {
       const v = r.payoff[i][j], on = tapeSel && tapeSel.i === i && tapeSel.j === j;
-      s += `<rect class="cell${on ? " on" : ""}" data-i="${i}" data-j="${j}" x="${label + ci * cell + 1}" y="${y + 1}" width="${cell - 2}" height="${cell - 2}" rx="2" fill="${fill(v, mine || r.mine[j])}"><title>${esc(r.names[i])} against ${esc(r.names[j])}: ${f2(v)} a turn</title></rect>`;
+      const pair = i === j ? `${r.names[i]} against itself: ${f2(v)} a turn` : `${r.names[i]} against ${r.names[j]}: ${f2(v)} a turn for ${r.names[i]}, ${f2(r.payoff[j][i])} for ${r.names[j]}`;
+      s += `<rect class="cell${on ? " on" : ""}" data-i="${i}" data-j="${j}" x="${label + ci * cell + 1}" y="${y + 1}" width="${cell - 2}" height="${cell - 2}" rx="2" fill="${fill(v, mine || r.mine[j])}"><title>${esc(pair)}. Click to see the tape.</title></rect>`;
       s += `<text pointer-events="none" x="${label + ci * cell + cell / 2}" y="${y + cell / 2 + 4}" text-anchor="middle" font-size="12" fill="${INK}" style="font-variant-numeric:tabular-nums">${f2(v)}</text>`;
     });
+    s += `<g><title>${esc(summary)}</title><rect x="${barX}" y="${y}" width="${w - barX}" height="${cell}" fill="transparent"/>`;
     s += `<rect x="${barX}" y="${y + cell / 2 - 1}" width="${barW}" height="2" fill="#f0f1f2"/>`;
     s += `<rect x="${barX}" y="${y + cell / 2 - 1}" width="${(barW * r.scores[i]) / 5}" height="2" fill="${mine ? ACCENT : "#9aa0a3"}"/>`;
-    s += `<text x="${w}" y="${y + cell / 2 + 4}" text-anchor="end" font-size="13" fill="${INK}" style="font-variant-numeric:tabular-nums">${f2(r.scores[i])}</text>`;
+    s += `<text x="${w}" y="${y + cell / 2 + 4}" text-anchor="end" font-size="13" fill="${INK}" style="font-variant-numeric:tabular-nums">${f2(r.scores[i])}</text></g>`;
   });
   s += `<text x="${barX}" y="${top - 8}" font-size="12" fill="${MUTED}">Mean a turn, out of 5</text>`;
   s += `</svg>`;

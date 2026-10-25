@@ -2,6 +2,8 @@
 
 **Axelrod's tournament, in your browser.** Write a Python strategy for the iterated prisoner's dilemma, run it round-robin against the classics, and watch every move.
 
+Live at **https://justagist.github.io/rapoport/**
+
 Rapoport is a static web app around the [Axelrod](https://github.com/Axelrod-Python/Axelrod) Python library. The library runs inside the visitor's browser through Pyodide, so the site needs no server and nothing a visitor writes leaves their computer. It is named after Anatol Rapoport, whose Tit For Tat won both of Robert Axelrod's tournaments; the name is a tribute, not an association.
 
 ## What it does
@@ -49,7 +51,7 @@ class Probe(axl.Player):
         return D if opponent.history[-2:] == [D, D] else C
 ```
 
-Inside `strategy`, `self.history` and `opponent.history` are the moves so far, `opponent.defections` counts theirs, and `self._random` is a seeded random source for stochastic strategies (set `"stochastic": True` in the classifier). The file must define exactly one `Player` subclass. The library's own strategies are readable from the "Library source" tab in the editor.
+Inside `strategy`, `self.history` and `opponent.history` are the moves so far, `opponent.defections` counts theirs, and `self._random` is a seeded random source for stochastic strategies (set `"stochastic": True` in the classifier). The file must define exactly one `Player` subclass. The library's own strategies are readable from the "Library source" tab in the editor, and "Copy into a new strategy" starts one from any of them, with `_copy` on its name until you rename it. A few library strategies lean on helpers from their own module; a copy of those reports the missing name when checked.
 
 ## Layout
 

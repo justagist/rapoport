@@ -18,6 +18,7 @@ const executablePath = process.env.CHROME_PATH || path.join(process.env.HOME, ".
 const browser = await chromium.launch({ executablePath });
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await context.newPage();
+page.on("dialog", (d) => d.accept());
 const failures = [];
 const check = (ok, what) => { console.log(`${ok ? "ok  " : "FAIL"} ${what}`); if (!ok) failures.push(what); };
 page.on("pageerror", (e) => failures.push("page error: " + e.message));
@@ -43,9 +44,21 @@ try {
   await page.reload();
   await page.waitForFunction(() => !document.getElementById("run").disabled, null, { timeout: 240000 });
 
+  // a library strategy copied as a starting point checks clean under its new name
+  await page.click('#tabs button[data-tab="source"]');
+  await page.waitForFunction(() => document.querySelector(".cm-content").textContent.includes("class TitForTat"));
+  await page.click("#copy-source");
+  await page.click("#check-btn");
+  await page.waitForSelector("#check-state.ok");
+  check((await page.textContent("#check-state")).includes("Tit For Tat_copy"), "a copied library strategy checks clean as Tit For Tat_copy");
+  await page.click("#delete");
+  await page.waitForSelector("#mine li:nth-child(2)", { state: "detached" });
+
   // exactly three library strategies plus the template
-  await page.evaluate(() => { for (const c of document.querySelectorAll('#lib input:checked')) c.click(); });
+  await page.click("#clear");
+  check((await page.$$(".roster input:checked")).length === 0, "clear selection unticks every strategy");
   for (const id of ["TitForTat", "Defector", "Grudger"]) await page.click(`#lib input[data-id="${id}"]`);
+  await page.click('#mine input[type="checkbox"]');
   await page.fill('.topbar [data-setting="turns"]', "50");
   await page.fill('.topbar [data-setting="repetitions"]', "2");
   await page.click("#run");
