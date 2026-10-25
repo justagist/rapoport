@@ -1,0 +1,11 @@
+{
+  "name": "rapoport",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "smoke": "node tests/smoke.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.52.0"
+  }
+}
