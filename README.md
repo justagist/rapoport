@@ -73,7 +73,8 @@ Inside `strategy`, `self.history` and `opponent.history` are the moves so far, `
 
 ```
 index.html, app.css, app.js   the arena
-guide.html                    the guide: the game, running a tournament, writing a strategy
+guide.html                    the guide: running a tournament, writing a strategy
+background.html               the theory: the dilemma, Axelrod's tournaments, where it shows up, with sources
 worker.js                     web worker: loads Pyodide and the library, answers engine commands
 py/engine.py                  the Python side: library listing, user strategies, match, tournament
 vendor/editor.js              the CodeMirror editor, bundled once from tools/editor-entry.js

@@ -52,7 +52,8 @@ a { color: inherit; }
 .roster .group { display: flex; align-items: center; margin: 16px 10px 6px; }
 .roster .group h2 { margin: 0; }
 .roster .pending { color: var(--muted); }
-.foot-guide { display: none; color: var(--accent); }
+.foot-links { display: none; }
+.foot-links a { color: var(--accent); }
 /* until the library has loaded, its controls are visible but faded and inert */
 .loading .library, .loading .search, .loading .source-pick, .loading #opponent { opacity: 0.45; pointer-events: none; }
 .roster .clear { margin-left: auto; min-height: 0; height: 24px; padding: 0 6px; border: 0; border-radius: 4px; background: none; color: var(--muted); font-size: 12px; }
@@ -102,6 +103,7 @@ select.input { height: var(--control-height); padding: 0 28px 0 10px; border: 1p
 h1 { font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: -0.01em; }
 .finding { color: var(--muted); margin-top: 4px; max-width: 72ch; }
 .finding b { color: var(--text); font-weight: 500; }
+.finding a { color: var(--accent); }
 .stamp { color: var(--muted); font-size: 12px; line-height: 20px; }
 
 .cards { display: grid; grid-template-columns: minmax(0, 1fr) 370px; gap: var(--gap); margin-top: var(--gap); }
@@ -201,7 +203,7 @@ h1 { font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: -0.01
   .roster .settings input { height: 44px; padding: 0 10px; border: 1px solid var(--control); border-radius: 6px; background: var(--surface); color: var(--text); width: 100%; }
   .roster .list li, .roster .new { height: 44px; }
   .nav { display: none; }
-  .foot-guide { display: inline; }
+  .foot-links { display: inline; }
   .roster .search { height: 44px; }
   .sheet { margin: 0; border-radius: 0; border-width: 1px 0 0; padding: 16px; }
   .progress { margin: -16px -16px 14px; border-radius: 0; }
@@ -220,10 +222,10 @@ h1 { font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: -0.01
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0.01ms !important; } }
 
 /* ---------- guide ---------- */
-.guide-page .app { grid-template-columns: minmax(0, 1fr); }
-.guide-page .topbar { padding: 0 24px 0 12px; }
-.guide-page .mark { text-decoration: none; padding: 6px 8px; }
-.guide-page .sheet { margin: 0 8px 8px; }
+.doc .app { grid-template-columns: minmax(0, 1fr); }
+.doc .topbar { padding: 0 24px 0 12px; gap: 8px; }
+.doc .mark { text-decoration: none; padding: 6px 8px; }
+.doc .sheet { margin: 0 8px 8px; }
 /* a centred column: 560 + 24 + 370 = 954, equal gutters either side */
 .guide-wrap { max-width: 954px; margin: 0 auto; }
 .guide { display: grid; grid-template-columns: minmax(0, 1fr) 370px; gap: var(--gap); margin-top: var(--gap); align-items: start; }
@@ -268,6 +270,6 @@ h1 { font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: -0.01
 }
 @media (max-width: 1024px) {
   .guide { grid-template-columns: minmax(0, 1fr); gap: 16px; }
-  .guide-page .sheet { margin: 0; }
+  .doc .sheet { margin: 0; }
   .side { position: static; }
 }

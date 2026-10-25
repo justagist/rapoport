@@ -105,6 +105,9 @@ try {
   await page.click('.nav a[href="guide.html"]');
   await page.waitForSelector("h1");
   check((await page.textContent("h1")) === "Guide" && (await page.$('a.btn[href="./"]')) !== null, "guide page opens from the roster and links back to the arena");
+  await page.click('a.btn[href="background.html"]');
+  await page.waitForSelector("h1");
+  check((await page.textContent("h1")) === "Background" && (await page.$("#src-11")) !== null, "background page opens from the guide and carries the sources");
   await page.goto(`http://localhost:${port}/`);
 
   // offline: the shell and the runtime come from the service worker cache
