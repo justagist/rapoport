@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guide · Rapoport</title>
+<meta name="description" content="How Axelrod's tournament works, how to run one in Rapoport, and how to write a strategy in Python.">
+<meta name="theme-color" content="#eef3ef">
+<link rel="icon" href="icons/mark.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"><!-- taste-skill-ignore: the mono is for code -->
+<link rel="stylesheet" href="app.css">
+</head>
+<body class="guide-page">
+<div class="app">
+  <header class="topbar">
+    <a class="mark" href="./"><svg viewBox="0 0 22 22" aria-hidden="true"><rect x="1" y="1" width="9" height="9" fill="#1b6c80"/><rect x="12.75" y="1.75" width="7.5" height="7.5" fill="none" stroke="#131416" stroke-width="1.5"/><rect x="1.75" y="12.75" width="7.5" height="7.5" fill="none" stroke="#131416" stroke-width="1.5"/><rect x="12" y="12" width="9" height="9" fill="#1b6c80"/></svg>Rapoport</a>
+    <span class="spacer"></span>
+    <a class="btn primary" href="./">Open the arena</a>
+  </header>
+
+  <main class="sheet">
+   <div class="guide-wrap">
+    <div class="title">
+      <div>
+        <h1>Guide</h1>
+        <p class="finding">How the tournament works, how to run one here, and how to write a strategy of your own.</p>
+      </div>
+    </div>
+
+    <div class="guide">
+      <div class="prose">
+        <section id="game">
+          <h2>The game</h2>
+          <p>Two suspects are held in separate cells. Each can stay silent or confess. If both stay silent, each serves a short sentence. If one confesses and the other stays silent, the confessor walks free and the silent one serves the longest sentence. If both confess, both serve a medium one. Whatever the other does, each suspect is better off confessing. Yet if both follow that logic, both end up worse than if both had stayed silent. That is the prisoner's dilemma.</p>
+          <p>Game theory strips the story down to two moves, cooperate (stay silent) and defect (confess), and scores them as points, the card on the right. In a single round, defecting is the safe choice. Axelrod's question was what happens when the same two players meet turn after turn and each remembers how the other has behaved. In 1980 he invited game theorists to submit strategies as programs and played every one against every other, 200 turns a match. Anatol Rapoport's entry, Tit For Tat, won both of his tournaments: cooperate on the first move, then do whatever the opponent did last. The strategies that did well were nice (never the first to defect), quick to retaliate, quick to forgive, and clear enough for an opponent to learn.</p>
+        </section>
+
+        <section id="arena">
+          <h2>Running a tournament</h2>
+          <ol>
+            <li><b>Pick the field.</b> Tick strategies in the roster. The library holds the 240 ordinary strategies of the Axelrod Python library; the search box finds one by name, and the ones marked slow take noticeably longer a match. Your own strategies sit above the library.</li>
+            <li><b>Set the scope.</b> Turns is the length of each match. Repetitions plays the whole round-robin that many times; it matters when any strategy is random or noise is on. Noise is the probability that a move is flipped on its way, so 0.05 flips one move in twenty. The seed makes random strategies and noise repeatable: the same field and seed give the same result.</li>
+            <li><b>Run.</b> Every pairing plays, including each strategy against a copy of itself, which is how Axelrod scored it.</li>
+            <li><b>Read the matrix.</b> Each cell is the row's payoff a turn against the column, averaged over the repetitions. Rows are ranked by their mean across the whole field, shown at the right. Hover a cell for both players' payoffs, or a name for what the strategy does. Your own strategies are tinted teal.</li>
+            <li><b>Watch the tape.</b> Click a cell to see that match move by move: one square a turn, filled for cooperate, hollow for defect, with the final scores. With several repetitions, the numbers above the tape switch between them. A tape longer than the card scrolls sideways.</li>
+          </ol>
+        </section>
+
+        <section id="strategy">
+          <h2>Writing a strategy</h2>
+          <p>A strategy is a Python class in the Axelrod library's own form, so anything you write here also runs with the library on your machine. The editor starts with this one:</p>
+<pre><code>import axelrod as axl
+from axelrod.action import Action
+
+C, D = Action.C, Action.D
+
+
+class Probe(axl.Player):
+    name = "Probe"
+    classifier = {
+        "memory_depth": 2,
+        "stochastic": False,
+        "inspects_source": False,
+        "manipulates_source": False,
+        "manipulates_state": False,
+    }
+
+    def strategy(self, opponent):
+        if len(self.history) == 0:
+            return D
+        if len(self.history) == 1:
+            return C
+        return D if opponent.history[-2:] == [D, D] else C</code></pre>
+          <p>Three parts matter. <b>name</b> is what the roster and the matrix show. <b>classifier</b> describes the strategy: set <code>"stochastic": True</code> if it uses randomness, and <code>"memory_depth"</code> to how many past turns it reads, or <code>float("inf")</code> for all of them. <b>strategy</b> is called every turn and returns <code>C</code> or <code>D</code>. The file must define exactly one Player subclass.</p>
+          <p>For randomness use <code>self._random</code>, which is seeded by the tournament, rather than the random module, so runs stay repeatable. <code>self._random.random()</code> gives a float and <code>self._random.random_choice(0.9)</code> returns C with that probability.</p>
+          <p><b>Check</b> compiles the class and plays twenty turns against Tit For Tat, showing the tape and the scores, or the Python error if it failed. <b>Play one match</b> runs it against any strategy at the current number of turns and shows the tape in the arena.</p>
+          <p>To start from something that exists, open the <b>Library source</b> tab, pick a strategy and choose <b>Copy into a new strategy</b>. The copy carries the imports it needs and <code>_copy</code> on its name until you rename it. A few library strategies lean on helpers from their own module; the check names anything missing.</p>
+          <p>Your strategies are kept in this browser. <b>Export</b> downloads one as a <code>.py</code> file and <b>Import</b> loads one, which is how to share them or move them between computers.</p>
+        </section>
+
+        <section id="local">
+          <h2>Where it runs</h2>
+          <p>Python runs inside this tab, through Pyodide, in a background thread so the page stays responsive. The first visit downloads the runtime and the library, about 50 MB; after that it is cached and the page works offline. No strategy, result or keystroke is sent anywhere.</p>
+          <p>Rapoport is named after Anatol Rapoport as a tribute; it has no connection with him or his estate. The engine is the <a href="https://github.com/Axelrod-Python/Axelrod">Axelrod library</a>, the editor is CodeMirror, and the source is at <a href="https://github.com/justagist/rapoport">github.com/justagist/rapoport</a>.</p>
+        </section>
+      </div>
+
+      <aside class="side">
+        <section class="card">
+          <h2>What a turn is worth</h2>
+          <p class="note">Each turn both players move at once. Your points depend on both moves.</p>
+          <table class="payoffs num">
+            <thead><tr><th></th><th>They cooperate</th><th>They defect</th></tr></thead>
+            <tbody>
+              <tr><th>You cooperate</th><td>3</td><td>0</td></tr>
+              <tr><th>You defect</th><td>5</td><td>1</td></tr>
+            </tbody>
+          </table>
+          <div class="facts outcomes num">
+            <div><span>Both cooperate</span><span>3 each, the reward</span></div>
+            <div><span>You defect, they cooperate</span><span>5 to you, the temptation</span></div>
+            <div><span>You cooperate, they defect</span><span>0 to you, the sucker's payoff</span></div>
+            <div><span>Both defect</span><span>1 each, the punishment</span></div>
+          </div>
+          <p class="note">Defecting always scores more than cooperating against the same move, which is the dilemma. But two players who cooperate every turn collect 3 each, while two who defect collect 1, so over a long match being trusted can be worth more than any single betrayal.</p>
+        </section>
+
+        <section class="card">
+          <h2>Probe against Tit For Tat</h2>
+          <p class="note">The template's smoke match, 20 turns, 59 to 59.</p>
+          <div class="tape sample">
+            <div class="row"><span class="who mine">Probe</span><svg viewBox="0 0 320 20" width="320" height="20" aria-label="Probe: defect once, then cooperate"><rect x="0.5" y="2.5" width="13" height="15" fill="none" stroke="#131416"/><rect x="16" y="2" width="14" height="16" fill="#1b6c80"/><rect x="32" y="2" width="14" height="16" fill="#1b6c80"/><rect x="48" y="2" width="14" height="16" fill="#1b6c80"/><rect x="64" y="2" width="14" height="16" fill="#1b6c80"/><rect x="80" y="2" width="14" height="16" fill="#1b6c80"/><rect x="96" y="2" width="14" height="16" fill="#1b6c80"/><rect x="112" y="2" width="14" height="16" fill="#1b6c80"/><rect x="128" y="2" width="14" height="16" fill="#1b6c80"/><rect x="144" y="2" width="14" height="16" fill="#1b6c80"/><rect x="160" y="2" width="14" height="16" fill="#1b6c80"/><rect x="176" y="2" width="14" height="16" fill="#1b6c80"/><rect x="192" y="2" width="14" height="16" fill="#1b6c80"/><rect x="208" y="2" width="14" height="16" fill="#1b6c80"/><rect x="224" y="2" width="14" height="16" fill="#1b6c80"/><rect x="240" y="2" width="14" height="16" fill="#1b6c80"/><rect x="256" y="2" width="14" height="16" fill="#1b6c80"/><rect x="272" y="2" width="14" height="16" fill="#1b6c80"/><rect x="288" y="2" width="14" height="16" fill="#1b6c80"/><rect x="304" y="2" width="14" height="16" fill="#1b6c80"/></svg></div>
+            <div class="row"><span class="who">Tit For Tat</span><svg viewBox="0 0 320 20" width="320" height="20" aria-label="Tit For Tat: cooperate, return the defection once, then cooperate"><rect x="0" y="2" width="14" height="16" fill="#1b6c80"/><rect x="16.5" y="2.5" width="13" height="15" fill="none" stroke="#131416"/><rect x="32" y="2" width="14" height="16" fill="#1b6c80"/><rect x="48" y="2" width="14" height="16" fill="#1b6c80"/><rect x="64" y="2" width="14" height="16" fill="#1b6c80"/><rect x="80" y="2" width="14" height="16" fill="#1b6c80"/><rect x="96" y="2" width="14" height="16" fill="#1b6c80"/><rect x="112" y="2" width="14" height="16" fill="#1b6c80"/><rect x="128" y="2" width="14" height="16" fill="#1b6c80"/><rect x="144" y="2" width="14" height="16" fill="#1b6c80"/><rect x="160" y="2" width="14" height="16" fill="#1b6c80"/><rect x="176" y="2" width="14" height="16" fill="#1b6c80"/><rect x="192" y="2" width="14" height="16" fill="#1b6c80"/><rect x="208" y="2" width="14" height="16" fill="#1b6c80"/><rect x="224" y="2" width="14" height="16" fill="#1b6c80"/><rect x="240" y="2" width="14" height="16" fill="#1b6c80"/><rect x="256" y="2" width="14" height="16" fill="#1b6c80"/><rect x="272" y="2" width="14" height="16" fill="#1b6c80"/><rect x="288" y="2" width="14" height="16" fill="#1b6c80"/><rect x="304" y="2" width="14" height="16" fill="#1b6c80"/></svg></div>
+          </div>
+          <p class="note">Probe opens with a defection to test the water. Tit For Tat returns it once, and then both cooperate for the rest of the match.</p>
+        </section>
+
+        <section class="card check">
+          <h2>Inside strategy(self, opponent)</h2>
+          <div class="facts api">
+            <div><span><code>self.history</code></span><span>your moves so far</span></div>
+            <div><span><code>opponent.history</code></span><span>theirs, a list of C and D</span></div>
+            <div><span><code>opponent.defections</code></span><span>their defections</span></div>
+            <div><span><code>opponent.cooperations</code></span><span>their cooperations</span></div>
+            <div><span><code>len(self.history)</code></span><span>the turn number</span></div>
+            <div><span><code>self._random.random()</code></span><span>a seeded float</span></div>
+            <div><span><code>self._random.random_choice(p)</code></span><span>C, chance p</span></div>
+          </div>
+        </section>
+      </aside>
+    </div>
+   </div>
+  </main>
+</div>
+</body>
+</html>

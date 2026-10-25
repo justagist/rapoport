@@ -77,6 +77,12 @@ try {
   await page.waitForSelector("#mine li");
   check((await page.$$eval("#mine li", (l) => l.length)) === names, "user strategies persist across reload");
 
+  // the guide is reachable from the roster and links back
+  await page.click('.nav a[href="guide.html"]');
+  await page.waitForSelector("h1");
+  check((await page.textContent("h1")) === "Guide" && (await page.$('a.btn[href="./"]')) !== null, "guide page opens from the roster and links back to the arena");
+  await page.goto(`http://localhost:${port}/`);
+
   // offline: the shell and the runtime come from the service worker cache
   await page.waitForFunction(() => !document.getElementById("run").disabled, null, { timeout: 240000 });
   await context.setOffline(true);

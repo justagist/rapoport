@@ -56,7 +56,8 @@ Inside `strategy`, `self.history` and `opponent.history` are the moves so far, `
 ## Layout
 
 ```
-index.html, app.css, app.js   the page
+index.html, app.css, app.js   the arena
+guide.html                    the guide: the game, running a tournament, writing a strategy
 worker.js                     web worker: loads Pyodide and the library, answers engine commands
 py/engine.py                  the Python side: library listing, user strategies, match, tournament
 sw.js, manifest.webmanifest   the progressive web app shell

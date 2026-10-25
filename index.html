@@ -17,6 +17,7 @@
 <div class="app">
   <aside class="roster" id="roster">
     <div class="mark"><svg viewBox="0 0 22 22" aria-hidden="true"><rect x="1" y="1" width="9" height="9" fill="#1b6c80"/><rect x="12.75" y="1.75" width="7.5" height="7.5" fill="none" stroke="#131416" stroke-width="1.5"/><rect x="1.75" y="12.75" width="7.5" height="7.5" fill="none" stroke="#131416" stroke-width="1.5"/><rect x="12" y="12" width="9" height="9" fill="#1b6c80"/></svg>Rapoport<button class="close" id="close-roster">Close</button></div>
+    <nav class="nav"><a aria-current="page" href="./">Arena</a><a href="guide.html">Guide</a></nav>
 
     <div class="settings">
       <label>Turns <input type="number" min="1" max="10000" value="200" data-setting="turns"></label>
@@ -66,7 +67,7 @@
           <div><h2>Payoff per turn, row against column</h2><p class="note" id="results-note">Mutual cooperation pays 3, mutual defection 1, a sucker 0 and a cheat 5. Rows are ranked by their mean.</p></div>
         </header>
         <div class="matrix" id="matrix"></div>
-        <p class="empty" id="results-empty">No run yet. Tick a few strategies in the roster and run a tournament.</p>
+        <p class="empty" id="results-empty">No run yet. Tick a few strategies in the roster and run a tournament, or <a href="guide.html">read the guide</a> first.</p>
       </section>
 
       <section class="card wide" id="tape-card">

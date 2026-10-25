@@ -2,9 +2,9 @@
 // online; the Python runtime, the wheels, the editor and the fonts are cached
 // the first time they are fetched, so later visits work offline.
 
-const SHELL = "rapoport-shell-v1";
+const SHELL = "rapoport-shell-v2";
 const RUNTIME = "rapoport-runtime-v1";
-const SHELL_FILES = ["./", "index.html", "app.css", "app.js", "worker.js", "py/engine.py", "manifest.webmanifest", "icons/mark.svg", "icons/icon-192.png", "icons/icon-512.png"];
+const SHELL_FILES = ["./", "index.html", "guide.html", "app.css", "app.js", "worker.js", "py/engine.py", "manifest.webmanifest", "icons/mark.svg", "icons/icon-192.png", "icons/icon-512.png"];
 const RUNTIME_HOSTS = ["cdn.jsdelivr.net", "esm.sh", "pypi.org", "files.pythonhosted.org", "fonts.googleapis.com", "fonts.gstatic.com"];
 
 self.addEventListener("install", (e) => {
